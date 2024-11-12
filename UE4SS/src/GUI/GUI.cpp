@@ -7,7 +7,6 @@
 #include <ExceptionHandling.hpp>
 #include <GUI/BPMods.hpp>
 #include <GUI/DX11.hpp>
-#include <GUI/Dumpers.hpp>
 #include <GUI/GLFW3_OpenGL3.hpp>
 #include <GUI/Windows.hpp>
 #include <fonts/droidsansfallback.cpp>
@@ -166,11 +165,11 @@ namespace RC::GUI
                     m_live_view.unset_listeners();
                 }
 
-                if (ImGui::BeginTabItem(ICON_FA_ARCHIVE " Dumpers"))
-                {
-                    Dumpers::render();
-                    ImGui::EndTabItem();
-                }
+                // if (ImGui::BeginTabItem(ICON_FA_ARCHIVE " Dumpers"))
+                // {
+                //     Dumpers::render();
+                //     ImGui::EndTabItem();
+                // }
 
                 if (ImGui::BeginTabItem(ICON_FA_PUZZLE_PIECE " BP Mods"))
                 {
