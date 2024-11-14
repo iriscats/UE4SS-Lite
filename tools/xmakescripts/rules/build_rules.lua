@@ -35,12 +35,11 @@ local CONFIG_TYPES = {
         ["optimize"] = {"none"},
     },
     ["Shipping"] = {
-        ["symbols"] = {"hidden"},
-        ["strip"] = {"all"},
+        ["symbols"] = {"debug"},
         ["defines"] = {
             "UE_BUILD_SHIPPING"
         },
-        ["optimize"] = {"smallest"}
+        ["optimize"] = {"fastest"}
     },
     ["Test"] = {
         ["symbols"] = {"debug"},
