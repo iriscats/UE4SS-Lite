@@ -1195,10 +1195,10 @@ namespace RC
                 return fmt::format("is_directory ran into error {}", ec.value());
             }
 
-            if (!std::filesystem::exists(mod_directory.path() / "enabled.txt", ec))
-            {
-                continue;
-            }
+            // if (!std::filesystem::exists(mod_directory.path() / "enabled.txt", ec))
+            // {
+            //     continue;
+            // }
             if (ec.value() != 0)
             {
                 return fmt::format("exists ran into error {}", ec.value());
@@ -1220,7 +1220,7 @@ namespace RC
                 continue;
             }
 
-            Output::send(STR("Mod '{}' has enabled.txt, starting mod.\n"), mod->get_name().data());
+            Output::send(STR("Load Mod '{}' , starting mod.\n"), mod->get_name().data());
             mod->start_mod();
         }
 
@@ -1686,66 +1686,66 @@ namespace RC
         //*/
 
         // Object & Property Dumper -> START
-        if (settings_manager.ObjectDumper.LoadAllAssetsBeforeDumpingObjects)
-        {
-            Output::send(STR("Loading all assets...\n"));
-            double asset_loading_duration{};
-            {
-                ScopedTimer loading_timer{&asset_loading_duration};
+        // if (settings_manager.ObjectDumper.LoadAllAssetsBeforeDumpingObjects)
+        // {
+        //     Output::send(STR("Loading all assets...\n"));
+        //     double asset_loading_duration{};
+        //     {
+        //         ScopedTimer loading_timer{&asset_loading_duration};
 
-                UAssetRegistry::LoadAllAssets();
-            }
-            Output::send(STR("Loading all assets took {} seconds\n"), asset_loading_duration);
-        }
+        //         UAssetRegistry::LoadAllAssets();
+        //     }
+        //     Output::send(STR("Loading all assets took {} seconds\n"), asset_loading_duration);
+        // }
 
-        double dumper_duration{};
-        {
-            ScopedTimer dumper_timer{&dumper_duration};
+        // double dumper_duration{};
+        // {
+        //     ScopedTimer dumper_timer{&dumper_duration};
 
-            std::unordered_set<FField*> dumped_fields;
-            // There will be tons of dumped fields so lets just reserve tons in order to speed things up a bit
-            dumped_fields.reserve(100000);
+        //     std::unordered_set<FField*> dumped_fields;
+        //     // There will be tons of dumped fields so lets just reserve tons in order to speed things up a bit
+        //     dumped_fields.reserve(100000);
 
-            bool is_below_425 = Unreal::Version::IsBelow(4, 25);
+        //     bool is_below_425 = Unreal::Version::IsBelow(4, 25);
 
-            // The final outputted string shouldn't need be reformatted just to put a new line at the end
-            // Instead the object/property implementations should add a new line in the last format that they do
-            //
-            // Optimizations done:
-            // 1. The entire code-base has been changed to use 'wchar_t' instead of 'char'.
-            // The effect of this is that there is no need to ever convert between types.
-            // There's also no thinking about which type should be used since 'wchar_t' is now the standard for UE4SS.
-            // The downside with wchar_t is that all files that get output to will be doubled in size.
+        //     // The final outputted string shouldn't need be reformatted just to put a new line at the end
+        //     // Instead the object/property implementations should add a new line in the last format that they do
+        //     //
+        //     // Optimizations done:
+        //     // 1. The entire code-base has been changed to use 'wchar_t' instead of 'char'.
+        //     // The effect of this is that there is no need to ever convert between types.
+        //     // There's also no thinking about which type should be used since 'wchar_t' is now the standard for UE4SS.
+        //     // The downside with wchar_t is that all files that get output to will be doubled in size.
 
-            using ObjectDumperOutputDevice = Output::NewFileDevice;
-            Output::Targets<ObjectDumperOutputDevice> scoped_dumper_out;
-            auto& file_device = scoped_dumper_out.get_device<ObjectDumperOutputDevice>();
-            file_device.set_file_name_and_path(output_path_and_file_name);
-            file_device.set_formatter([](File::StringViewType string) -> File::StringType {
-                return File::StringType{string};
-            });
+        //     using ObjectDumperOutputDevice = Output::NewFileDevice;
+        //     Output::Targets<ObjectDumperOutputDevice> scoped_dumper_out;
+        //     auto& file_device = scoped_dumper_out.get_device<ObjectDumperOutputDevice>();
+        //     file_device.set_file_name_and_path(output_path_and_file_name);
+        //     file_device.set_formatter([](File::StringViewType string) -> File::StringType {
+        //         return File::StringType{string};
+        //     });
 
-            // Make string & reserve massive amounts of space to hopefully not reach the end of the string and require more
-            // dynamic allocations
-            StringType out_line;
-            out_line.reserve(200000000);
+        //     // Make string & reserve massive amounts of space to hopefully not reach the end of the string and require more
+        //     // dynamic allocations
+        //     StringType out_line;
+        //     out_line.reserve(200000000);
 
-            Output::send(STR("Dumping all objects & properties in GUObjectArray\n"));
-            UObjectGlobals::ForEachUObject([&](void* object, [[maybe_unused]] int32_t chunk_index, [[maybe_unused]] int32_t object_index) {
-                dump_uobject(static_cast<UObject*>(object), &dumped_fields, out_line, is_below_425);
-                return LoopAction::Continue;
-            });
+        //     Output::send(STR("Dumping all objects & properties in GUObjectArray\n"));
+        //     UObjectGlobals::ForEachUObject([&](void* object, [[maybe_unused]] int32_t chunk_index, [[maybe_unused]] int32_t object_index) {
+        //         dump_uobject(static_cast<UObject*>(object), &dumped_fields, out_line, is_below_425);
+        //         return LoopAction::Continue;
+        //     });
 
-            // Save to file
-            scoped_dumper_out.send(out_line);
+        //     // Save to file
+        //     scoped_dumper_out.send(out_line);
 
-            // Reset the dumped_fields set, otherwise no fields will be dumped in subsequent dumps
-            dumped_fields.clear();
-            Output::send(STR("Done iterating GUObjectArray\n"));
-        }
+        //     // Reset the dumped_fields set, otherwise no fields will be dumped in subsequent dumps
+        //     dumped_fields.clear();
+        //     Output::send(STR("Done iterating GUObjectArray\n"));
+        // }
 
-        UAssetRegistry::FreeAllForcefullyLoadedAssets();
-        Output::send(STR("Dumping GUObjectArray took {} seconds\n"), dumper_duration);
+        // UAssetRegistry::FreeAllForcefullyLoadedAssets();
+        // Output::send(STR("Dumping GUObjectArray took {} seconds\n"), dumper_duration);
         // Object & Property Dumper -> END
     }
 
