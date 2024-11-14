@@ -16,9 +16,9 @@
 #include <Profiler/Profiler.hpp>
 #include <DynamicOutput/DynamicOutput.hpp>
 #include <ExceptionHandling.hpp>
-#include <GUI/ConsoleOutputDevice.hpp>
-#include <GUI/GUI.hpp>
-#include <GUI/LiveView.hpp>
+// #include <GUI/ConsoleOutputDevice.hpp>
+// #include <GUI/GUI.hpp>
+// #include <GUI/LiveView.hpp>
 #include <Helpers/ASM.hpp>
 #include <Helpers/Format.hpp>
 #include <Helpers/Integer.hpp>
@@ -184,7 +184,7 @@ namespace RC
 
             m_crash_dumper.set_full_memory_dump(settings_manager.CrashDump.FullMemoryDump);
 
-            m_debugging_gui.set_gfx_backend(settings_manager.Debug.GraphicsAPI);
+            //m_debugging_gui.set_gfx_backend(settings_manager.Debug.GraphicsAPI);
 
             // Setup the log file
             auto& file_device = Output::set_default_devices<Output::NewFileDevice>();
@@ -192,17 +192,17 @@ namespace RC
 
             create_simple_console();
 
-            if (settings_manager.Debug.DebugConsoleEnabled)
-            {
-                m_console_device = &Output::set_default_devices<Output::ConsoleDevice>();
-                m_console_device->set_formatter([](File::StringViewType string) -> File::StringType {
-                    return fmt::format(STR("[{}] {}"), fmt::format(STR("{:%X}"), std::chrono::system_clock::now()), string);
-                });
-                if (settings_manager.Debug.DebugConsoleVisible)
-                {
-                    m_render_thread = std::jthread{&GUI::gui_thread, &m_debugging_gui};
-                }
-            }
+            // if (settings_manager.Debug.DebugConsoleEnabled)
+            // {
+            //     m_console_device = &Output::set_default_devices<Output::ConsoleDevice>();
+            //     m_console_device->set_formatter([](File::StringViewType string) -> File::StringType {
+            //         return fmt::format(STR("[{}] {}"), fmt::format(STR("{:%X}"), std::chrono::system_clock::now()), string);
+            //     });
+            //     if (settings_manager.Debug.DebugConsoleVisible)
+            //     {
+            //         m_render_thread = std::jthread{&GUI::gui_thread, &m_debugging_gui};
+            //     }
+            // }
 
             // This is experimental code that's here only for future reference
             /*
@@ -803,29 +803,29 @@ namespace RC
         UObjectArray::AddUObjectCreateListener(&FUEDeathListener::UEDeathListener);
         //*/
 
-        if (settings_manager.Debug.DebugConsoleEnabled)
-        {
-            if (settings_manager.General.UseUObjectArrayCache)
-            {
-                m_debugging_gui.get_live_view().set_listeners_allowed(true);
-            }
-            else
-            {
-                m_debugging_gui.get_live_view().set_listeners_allowed(false);
-            }
+        // if (settings_manager.Debug.DebugConsoleEnabled)
+        // {
+        //     if (settings_manager.General.UseUObjectArrayCache)
+        //     {
+        //         m_debugging_gui.get_live_view().set_listeners_allowed(true);
+        //     }
+        //     else
+        //     {
+        //         m_debugging_gui.get_live_view().set_listeners_allowed(false);
+        //     }
 
-            m_input_handler.register_keydown_event(Input::Key::O, {Input::ModifierKey::CONTROL}, [&]() {
-                TRY([&] {
-                    auto was_gui_open = get_debugging_ui().is_open();
-                    stop_render_thread();
-                    if (!was_gui_open)
-                    {
-                        m_render_thread = std::jthread{&GUI::gui_thread, &m_debugging_gui};
-                        fire_ui_init_for_cpp_mods();
-                    }
-                });
-            });
-        }
+        //     m_input_handler.register_keydown_event(Input::Key::O, {Input::ModifierKey::CONTROL}, [&]() {
+        //         TRY([&] {
+        //             auto was_gui_open = get_debugging_ui().is_open();
+        //             stop_render_thread();
+        //             if (!was_gui_open)
+        //             {
+        //                 m_render_thread = std::jthread{&GUI::gui_thread, &m_debugging_gui};
+        //                 fire_ui_init_for_cpp_mods();
+        //             }
+        //         });
+        //     });
+        // }
 
 #ifdef TIME_FUNCTION_MACRO_ENABLED
         m_input_handler.register_keydown_event(Input::Key::Y, {Input::ModifierKey::CONTROL}, [&]() {
@@ -1456,24 +1456,24 @@ namespace RC
         // Output::send(STR("SDK generated in {} seconds.\n"), generator_duration);
     }
 
-    auto UE4SSProgram::stop_render_thread() -> void
-    {
-        if (m_render_thread.joinable())
-        {
-            m_render_thread.request_stop();
-            m_render_thread.join();
-        }
-    }
+    // auto UE4SSProgram::stop_render_thread() -> void
+    // {
+        // if (m_render_thread.joinable())
+        // {
+        //     m_render_thread.request_stop();
+        //     m_render_thread.join();
+        // }
+    //}
 
-    auto UE4SSProgram::add_gui_tab(std::shared_ptr<GUI::GUITab> tab) -> void
-    {
-        m_debugging_gui.add_tab(tab);
-    }
+    // auto UE4SSProgram::add_gui_tab(std::shared_ptr<GUI::GUITab> tab) -> void
+    // {
+        //m_debugging_gui.add_tab(tab);
+    //}
 
-    auto UE4SSProgram::remove_gui_tab(std::shared_ptr<GUI::GUITab> tab) -> void
-    {
-        m_debugging_gui.remove_tab(tab);
-    }
+    // auto UE4SSProgram::remove_gui_tab(std::shared_ptr<GUI::GUITab> tab) -> void
+    // {
+        //m_debugging_gui.remove_tab(tab);
+    //}
 
     auto UE4SSProgram::queue_event(EventCallable callable, void* data) -> void
     {

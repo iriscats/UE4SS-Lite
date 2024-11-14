@@ -5,7 +5,6 @@
 
 #include <Common.hpp>
 #include <File/Macros.hpp>
-#include <GUI/GUITab.hpp>
 #include <Input/Handler.hpp>
 
 #include <String/StringType.hpp>
@@ -31,7 +30,7 @@ namespace RC
     class CppUserModBase
     {
       protected:
-        std::vector<std::shared_ptr<GUI::GUITab>> GUITabs{};
+        //std::vector<std::shared_ptr<GUI::GUITab>> GUITabs{};
 
       public:
         StringType ModName{};
@@ -134,7 +133,7 @@ namespace RC
         RC_UE4SS_API virtual auto render_tab() -> void{};
 
       protected:
-        RC_UE4SS_API auto register_tab(StringViewType tab_name, GUI::GUITab::RenderFunctionType) -> void;
+        //RC_UE4SS_API auto register_tab(StringViewType tab_name, GUI::GUITab::RenderFunctionType) -> void;
         RC_UE4SS_API auto register_keydown_event(Input::Key, const Input::EventCallbackCallable&, uint8_t custom_data = 0) -> void;
         RC_UE4SS_API auto register_keydown_event(Input::Key, const Input::Handler::ModifierKeyArray&, const Input::EventCallbackCallable&, uint8_t custom_data = 0)
                 -> void;
