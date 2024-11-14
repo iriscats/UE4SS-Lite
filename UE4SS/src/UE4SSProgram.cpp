@@ -1195,10 +1195,10 @@ namespace RC
                 return fmt::format("is_directory ran into error {}", ec.value());
             }
 
-            // if (!std::filesystem::exists(mod_directory.path() / "enabled.txt", ec))
-            // {
-            //     continue;
-            // }
+            if (!std::filesystem::exists(mod_directory.path() / "enabled.txt", ec))
+            {
+                continue;
+            }
             if (ec.value() != 0)
             {
                 return fmt::format("exists ran into error {}", ec.value());
