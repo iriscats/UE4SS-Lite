@@ -16,9 +16,9 @@
 #include <Profiler/Profiler.hpp>
 #include <DynamicOutput/DynamicOutput.hpp>
 #include <ExceptionHandling.hpp>
-#include <GUI/ConsoleOutputDevice.hpp>
-#include <GUI/GUI.hpp>
-#include <GUI/LiveView.hpp>
+// #include <GUI/ConsoleOutputDevice.hpp>
+// #include <GUI/GUI.hpp>
+// #include <GUI/LiveView.hpp>
 #include <Helpers/ASM.hpp>
 #include <Helpers/Format.hpp>
 #include <Helpers/Integer.hpp>
@@ -30,9 +30,6 @@
 #include <Mod/CppMod.hpp>
 #include <Mod/LuaMod.hpp>
 #include <Mod/Mod.hpp>
-#include <ObjectDumper/ObjectToString.hpp>
-#include <SDKGenerator/Generator.hpp>
-#include <SDKGenerator/UEHeaderGenerator.hpp>
 #include <SigScanner/SinglePassSigScanner.hpp>
 #include <Signatures.hpp>
 #include <Timer/ScopedTimer.hpp>
@@ -187,7 +184,7 @@ namespace RC
 
             m_crash_dumper.set_full_memory_dump(settings_manager.CrashDump.FullMemoryDump);
 
-            m_debugging_gui.set_gfx_backend(settings_manager.Debug.GraphicsAPI);
+            //m_debugging_gui.set_gfx_backend(settings_manager.Debug.GraphicsAPI);
 
             // Setup the log file
             auto& file_device = Output::set_default_devices<Output::NewFileDevice>();
@@ -195,17 +192,17 @@ namespace RC
 
             create_simple_console();
 
-            if (settings_manager.Debug.DebugConsoleEnabled)
-            {
-                m_console_device = &Output::set_default_devices<Output::ConsoleDevice>();
-                m_console_device->set_formatter([](File::StringViewType string) -> File::StringType {
-                    return fmt::format(STR("[{}] {}"), fmt::format(STR("{:%X}"), std::chrono::system_clock::now()), string);
-                });
-                if (settings_manager.Debug.DebugConsoleVisible)
-                {
-                    m_render_thread = std::jthread{&GUI::gui_thread, &m_debugging_gui};
-                }
-            }
+            // if (settings_manager.Debug.DebugConsoleEnabled)
+            // {
+            //     m_console_device = &Output::set_default_devices<Output::ConsoleDevice>();
+            //     m_console_device->set_formatter([](File::StringViewType string) -> File::StringType {
+            //         return fmt::format(STR("[{}] {}"), fmt::format(STR("{:%X}"), std::chrono::system_clock::now()), string);
+            //     });
+            //     if (settings_manager.Debug.DebugConsoleVisible)
+            //     {
+            //         m_render_thread = std::jthread{&GUI::gui_thread, &m_debugging_gui};
+            //     }
+            // }
 
             // This is experimental code that's here only for future reference
             /*
@@ -767,9 +764,7 @@ namespace RC
         config.bHookLocalPlayerExec = settings_manager.Hooks.HookLocalPlayerExec;
         config.bHookAActorTick = settings_manager.Hooks.HookAActorTick;
         config.FExecVTableOffsetInLocalPlayer = settings_manager.Hooks.FExecVTableOffsetInLocalPlayer;
-        // Apply Debug Build setting from settings file only for now.
-        Unreal::Version::DebugBuild = settings_manager.EngineVersionOverride.DebugBuild;
-        Output::send<LogLevel::Warning>(STR("DebugGame Setting Enabled? {}\n"), Unreal::Version::DebugBuild);
+
         Unreal::UnrealInitializer::Initialize(config);
 
         bool can_create_custom_events{true};
@@ -808,29 +803,29 @@ namespace RC
         UObjectArray::AddUObjectCreateListener(&FUEDeathListener::UEDeathListener);
         //*/
 
-        if (settings_manager.Debug.DebugConsoleEnabled)
-        {
-            if (settings_manager.General.UseUObjectArrayCache)
-            {
-                m_debugging_gui.get_live_view().set_listeners_allowed(true);
-            }
-            else
-            {
-                m_debugging_gui.get_live_view().set_listeners_allowed(false);
-            }
+        // if (settings_manager.Debug.DebugConsoleEnabled)
+        // {
+        //     if (settings_manager.General.UseUObjectArrayCache)
+        //     {
+        //         m_debugging_gui.get_live_view().set_listeners_allowed(true);
+        //     }
+        //     else
+        //     {
+        //         m_debugging_gui.get_live_view().set_listeners_allowed(false);
+        //     }
 
-            m_input_handler.register_keydown_event(Input::Key::O, {Input::ModifierKey::CONTROL}, [&]() {
-                TRY([&] {
-                    auto was_gui_open = get_debugging_ui().is_open();
-                    stop_render_thread();
-                    if (!was_gui_open)
-                    {
-                        m_render_thread = std::jthread{&GUI::gui_thread, &m_debugging_gui};
-                        fire_ui_init_for_cpp_mods();
-                    }
-                });
-            });
-        }
+        //     m_input_handler.register_keydown_event(Input::Key::O, {Input::ModifierKey::CONTROL}, [&]() {
+        //         TRY([&] {
+        //             auto was_gui_open = get_debugging_ui().is_open();
+        //             stop_render_thread();
+        //             if (!was_gui_open)
+        //             {
+        //                 m_render_thread = std::jthread{&GUI::gui_thread, &m_debugging_gui};
+        //                 fire_ui_init_for_cpp_mods();
+        //             }
+        //         });
+        //     });
+        // }
 
 #ifdef TIME_FUNCTION_MACRO_ENABLED
         m_input_handler.register_keydown_event(Input::Key::Y, {Input::ModifierKey::CONTROL}, [&]() {
@@ -849,7 +844,7 @@ namespace RC
 #endif
 
         TRY([&] {
-            ObjectDumper::init();
+            //ObjectDumper::init();
 
             if (settings_manager.General.EnableHotReloadSystem)
             {
@@ -1225,7 +1220,7 @@ namespace RC
                 continue;
             }
 
-            Output::send(STR("Mod '{}' has enabled.txt, starting mod.\n"), mod->get_name().data());
+            Output::send(STR("Load Mod '{}' , starting mod.\n"), mod->get_name().data());
             mod->start_mod();
         }
 
@@ -1386,99 +1381,99 @@ namespace RC
 
     auto UE4SSProgram::generate_uht_compatible_headers() -> void
     {
-        ProfilerScope();
-        Output::send(STR("Generating UHT compatible headers...\n"));
+        // ProfilerScope();
+        // Output::send(STR("Generating UHT compatible headers...\n"));
 
-        double generator_duration{};
-        {
-            ScopedTimer generator_timer{&generator_duration};
+        // double generator_duration{};
+        // {
+        //     ScopedTimer generator_timer{&generator_duration};
 
-            const std::filesystem::path DumpRootDirectory = m_working_directory / "UHTHeaderDump";
-            UEGenerator::UEHeaderGenerator HeaderGenerator = UEGenerator::UEHeaderGenerator(DumpRootDirectory);
-            HeaderGenerator.dump_native_packages();
-        }
+        //     const std::filesystem::path DumpRootDirectory = m_working_directory / "UHTHeaderDump";
+        //     UEGenerator::UEHeaderGenerator HeaderGenerator = UEGenerator::UEHeaderGenerator(DumpRootDirectory);
+        //     HeaderGenerator.dump_native_packages();
+        // }
 
-        Output::send(STR("Generating UHT compatible headers took {} seconds\n"), generator_duration);
+        // Output::send(STR("Generating UHT compatible headers took {} seconds\n"), generator_duration);
     }
 
     auto UE4SSProgram::generate_cxx_headers(const std::filesystem::path& output_dir) -> void
     {
-        ProfilerScope();
-        if (settings_manager.CXXHeaderGenerator.LoadAllAssetsBeforeGeneratingCXXHeaders)
-        {
-            Output::send(STR("Loading all assets...\n"));
-            double asset_loading_duration{};
-            {
-                ProfilerScopeNamed("loading all assets");
-                ScopedTimer loading_timer{&asset_loading_duration};
+        // ProfilerScope();
+        // if (settings_manager.CXXHeaderGenerator.LoadAllAssetsBeforeGeneratingCXXHeaders)
+        // {
+        //     Output::send(STR("Loading all assets...\n"));
+        //     double asset_loading_duration{};
+        //     {
+        //         ProfilerScopeNamed("loading all assets");
+        //         ScopedTimer loading_timer{&asset_loading_duration};
 
-                UAssetRegistry::LoadAllAssets();
-            }
-            Output::send(STR("Loading all assets took {} seconds\n"), asset_loading_duration);
-        }
+        //         UAssetRegistry::LoadAllAssets();
+        //     }
+        //     Output::send(STR("Loading all assets took {} seconds\n"), asset_loading_duration);
+        // }
 
-        double generator_duration;
-        {
-            ProfilerScopeNamed("unloading all force-loaded assets");
-            ScopedTimer generator_timer{&generator_duration};
+        // double generator_duration;
+        // {
+        //     ProfilerScopeNamed("unloading all force-loaded assets");
+        //     ScopedTimer generator_timer{&generator_duration};
 
-            UEGenerator::generate_cxx_headers(output_dir);
+        //     UEGenerator::generate_cxx_headers(output_dir);
 
-            Output::send(STR("Unloading all forcefully loaded assets\n"));
-        }
+        //     Output::send(STR("Unloading all forcefully loaded assets\n"));
+        // }
 
-        UAssetRegistry::FreeAllForcefullyLoadedAssets();
-        Output::send(STR("SDK generated in {} seconds.\n"), generator_duration);
+        // UAssetRegistry::FreeAllForcefullyLoadedAssets();
+        // Output::send(STR("SDK generated in {} seconds.\n"), generator_duration);
     }
 
     auto UE4SSProgram::generate_lua_types(const std::filesystem::path& output_dir) -> void
     {
-        ProfilerScope();
-        if (settings_manager.CXXHeaderGenerator.LoadAllAssetsBeforeGeneratingCXXHeaders)
-        {
-            Output::send(STR("Loading all assets...\n"));
-            double asset_loading_duration{};
-            {
-                ProfilerScopeNamed("loading all assets");
-                ScopedTimer loading_timer{&asset_loading_duration};
+        // ProfilerScope();
+        // if (settings_manager.CXXHeaderGenerator.LoadAllAssetsBeforeGeneratingCXXHeaders)
+        // {
+        //     Output::send(STR("Loading all assets...\n"));
+        //     double asset_loading_duration{};
+        //     {
+        //         ProfilerScopeNamed("loading all assets");
+        //         ScopedTimer loading_timer{&asset_loading_duration};
 
-                UAssetRegistry::LoadAllAssets();
-            }
-            Output::send(STR("Loading all assets took {} seconds\n"), asset_loading_duration);
-        }
+        //         UAssetRegistry::LoadAllAssets();
+        //     }
+        //     Output::send(STR("Loading all assets took {} seconds\n"), asset_loading_duration);
+        // }
 
-        double generator_duration;
-        {
-            ProfilerScopeNamed("unloading all force-loaded assets");
-            ScopedTimer generator_timer{&generator_duration};
+        // double generator_duration;
+        // {
+        //     ProfilerScopeNamed("unloading all force-loaded assets");
+        //     ScopedTimer generator_timer{&generator_duration};
 
-            UEGenerator::generate_lua_types(output_dir);
+        //     UEGenerator::generate_lua_types(output_dir);
 
-            Output::send(STR("Unloading all forcefully loaded assets\n"));
-        }
+        //     Output::send(STR("Unloading all forcefully loaded assets\n"));
+        // }
 
-        UAssetRegistry::FreeAllForcefullyLoadedAssets();
-        Output::send(STR("SDK generated in {} seconds.\n"), generator_duration);
+        // UAssetRegistry::FreeAllForcefullyLoadedAssets();
+        // Output::send(STR("SDK generated in {} seconds.\n"), generator_duration);
     }
 
-    auto UE4SSProgram::stop_render_thread() -> void
-    {
-        if (m_render_thread.joinable())
-        {
-            m_render_thread.request_stop();
-            m_render_thread.join();
-        }
-    }
+    // auto UE4SSProgram::stop_render_thread() -> void
+    // {
+        // if (m_render_thread.joinable())
+        // {
+        //     m_render_thread.request_stop();
+        //     m_render_thread.join();
+        // }
+    //}
 
-    auto UE4SSProgram::add_gui_tab(std::shared_ptr<GUI::GUITab> tab) -> void
-    {
-        m_debugging_gui.add_tab(tab);
-    }
+    // auto UE4SSProgram::add_gui_tab(std::shared_ptr<GUI::GUITab> tab) -> void
+    // {
+        //m_debugging_gui.add_tab(tab);
+    //}
 
-    auto UE4SSProgram::remove_gui_tab(std::shared_ptr<GUI::GUITab> tab) -> void
-    {
-        m_debugging_gui.remove_tab(tab);
-    }
+    // auto UE4SSProgram::remove_gui_tab(std::shared_ptr<GUI::GUITab> tab) -> void
+    // {
+        //m_debugging_gui.remove_tab(tab);
+    //}
 
     auto UE4SSProgram::queue_event(EventCallable callable, void* data) -> void
     {
@@ -1575,109 +1570,109 @@ namespace RC
 
     auto UE4SSProgram::dump_uobject(UObject* object, std::unordered_set<FField*>* in_dumped_fields, StringType& out_line, bool is_below_425) -> void
     {
-        bool owns_dumped_fields{};
-        auto dumped_fields_ptr = [&] {
-            if (in_dumped_fields)
-            {
-                return in_dumped_fields;
-            }
-            else
-            {
-                owns_dumped_fields = true;
-                return new std::unordered_set<FField*>{};
-            }
-        }();
-        auto& dumped_fields = *dumped_fields_ptr;
+        // bool owns_dumped_fields{};
+        // auto dumped_fields_ptr = [&] {
+        //     if (in_dumped_fields)
+        //     {
+        //         return in_dumped_fields;
+        //     }
+        //     else
+        //     {
+        //         owns_dumped_fields = true;
+        //         return new std::unordered_set<FField*>{};
+        //     }
+        // }();
+        // auto& dumped_fields = *dumped_fields_ptr;
 
-        UObject* typed_obj = static_cast<UObject*>(object);
+        // UObject* typed_obj = static_cast<UObject*>(object);
 
-        if (is_below_425 && Unreal::TypeChecker::is_property(typed_obj) &&
-            !typed_obj->HasAnyFlags(static_cast<EObjectFlags>(EObjectFlags::RF_DefaultSubObject | EObjectFlags::RF_ArchetypeObject)))
-        {
-            // We've verified that we're in <4.25 so this cast is safe but should be abstracted at some point
-            dump_xproperty(std::bit_cast<FProperty*>(typed_obj), out_line);
-        }
-        else
-        {
-            auto typed_class = typed_obj->GetClassPrivate()->HashObject();
-            if (ObjectDumper::to_string_exists(typed_class))
-            {
-                // Call type-specific implementation to dump UObject
-                // The type is determined at runtime
+        // if (is_below_425 && Unreal::TypeChecker::is_property(typed_obj) &&
+        //     !typed_obj->HasAnyFlags(static_cast<EObjectFlags>(EObjectFlags::RF_DefaultSubObject | EObjectFlags::RF_ArchetypeObject)))
+        // {
+        //     // We've verified that we're in <4.25 so this cast is safe but should be abstracted at some point
+        //     dump_xproperty(std::bit_cast<FProperty*>(typed_obj), out_line);
+        // }
+        // else
+        // {
+        //     auto typed_class = typed_obj->GetClassPrivate()->HashObject();
+        //     if (ObjectDumper::to_string_exists(typed_class))
+        //     {
+        //         // Call type-specific implementation to dump UObject
+        //         // The type is determined at runtime
 
-                // Dump UObject
-                ObjectDumper::get_to_string(typed_class)(object, out_line);
-                out_line.append(STR("\n"));
+        //         // Dump UObject
+        //         ObjectDumper::get_to_string(typed_class)(object, out_line);
+        //         out_line.append(STR("\n"));
 
-                if (!is_below_425 && ObjectDumper::to_string_complex_exists(typed_class))
-                {
-                    // Dump all properties that are directly owned by this UObject (not its UClass)
-                    // UE 4.25+ (properties are part of GUObjectArray in earlier versions)
-                    ObjectDumper::get_to_string_complex(typed_class)(object, out_line, [&](void* prop) {
-                        if (dumped_fields.contains(static_cast<FField*>(prop)))
-                        {
-                            return;
-                        }
+        //         if (!is_below_425 && ObjectDumper::to_string_complex_exists(typed_class))
+        //         {
+        //             // Dump all properties that are directly owned by this UObject (not its UClass)
+        //             // UE 4.25+ (properties are part of GUObjectArray in earlier versions)
+        //             ObjectDumper::get_to_string_complex(typed_class)(object, out_line, [&](void* prop) {
+        //                 if (dumped_fields.contains(static_cast<FField*>(prop)))
+        //                 {
+        //                     return;
+        //                 }
 
-                        dump_xproperty(static_cast<FProperty*>(prop), out_line);
-                        dumped_fields.emplace(static_cast<FField*>(prop));
-                    });
-                }
-            }
-            else
-            {
-                // A type-specific implementation does not exist so lets call the default implementation for UObjects instead
-                ObjectDumper::object_to_string(object, out_line);
-                out_line.append(STR("\n"));
-            }
+        //                 dump_xproperty(static_cast<FProperty*>(prop), out_line);
+        //                 dumped_fields.emplace(static_cast<FField*>(prop));
+        //             });
+        //         }
+        //     }
+        //     else
+        //     {
+        //         // A type-specific implementation does not exist so lets call the default implementation for UObjects instead
+        //         ObjectDumper::object_to_string(object, out_line);
+        //         out_line.append(STR("\n"));
+        //     }
 
-            // If the UClass of the UObject has any properties then dump them
-            // UE 4.25+ (properties are part of GUObjectArray in earlier versions)
-            if (!is_below_425)
-            {
-                if (typed_obj->IsA<UStruct>())
-                {
-                    for (FProperty* prop : static_cast<UClass*>(typed_obj)->ForEachProperty())
-                    {
-                        if (dumped_fields.contains(prop))
-                        {
-                            continue;
-                        }
+        //     // If the UClass of the UObject has any properties then dump them
+        //     // UE 4.25+ (properties are part of GUObjectArray in earlier versions)
+        //     if (!is_below_425)
+        //     {
+        //         if (typed_obj->IsA<UStruct>())
+        //         {
+        //             for (FProperty* prop : static_cast<UClass*>(typed_obj)->ForEachProperty())
+        //             {
+        //                 if (dumped_fields.contains(prop))
+        //                 {
+        //                     continue;
+        //                 }
 
-                        dump_xproperty(prop, out_line);
-                        dumped_fields.emplace(prop);
-                    }
-                }
-            }
-        }
+        //                 dump_xproperty(prop, out_line);
+        //                 dumped_fields.emplace(prop);
+        //             }
+        //         }
+        //     }
+        // }
 
-        if (owns_dumped_fields)
-        {
-            delete dumped_fields_ptr;
-        }
+        // if (owns_dumped_fields)
+        // {
+        //     delete dumped_fields_ptr;
+        // }
     }
 
     auto UE4SSProgram::dump_xproperty(FProperty* property, StringType& out_line) -> void
     {
-        auto typed_prop_class = property->GetClass().HashObject();
+        // auto typed_prop_class = property->GetClass().HashObject();
 
-        if (ObjectDumper::to_string_exists(typed_prop_class))
-        {
-            ObjectDumper::get_to_string(typed_prop_class)(property, out_line);
-            out_line.append(STR("\n"));
+        // if (ObjectDumper::to_string_exists(typed_prop_class))
+        // {
+        //     ObjectDumper::get_to_string(typed_prop_class)(property, out_line);
+        //     out_line.append(STR("\n"));
 
-            if (ObjectDumper::to_string_complex_exists(typed_prop_class))
-            {
-                ObjectDumper::get_to_string_complex(typed_prop_class)(property, out_line, [&]([[maybe_unused]] void* prop) {
-                    out_line.append(STR("\n"));
-                });
-            }
-        }
-        else
-        {
-            ObjectDumper::property_to_string(property, out_line);
-            out_line.append(STR("\n"));
-        }
+        //     if (ObjectDumper::to_string_complex_exists(typed_prop_class))
+        //     {
+        //         ObjectDumper::get_to_string_complex(typed_prop_class)(property, out_line, [&]([[maybe_unused]] void* prop) {
+        //             out_line.append(STR("\n"));
+        //         });
+        //     }
+        // }
+        // else
+        // {
+        //     ObjectDumper::property_to_string(property, out_line);
+        //     out_line.append(STR("\n"));
+        // }
     }
 
     auto UE4SSProgram::dump_all_objects_and_properties(const File::StringType& output_path_and_file_name) -> void
@@ -1691,66 +1686,66 @@ namespace RC
         //*/
 
         // Object & Property Dumper -> START
-        if (settings_manager.ObjectDumper.LoadAllAssetsBeforeDumpingObjects)
-        {
-            Output::send(STR("Loading all assets...\n"));
-            double asset_loading_duration{};
-            {
-                ScopedTimer loading_timer{&asset_loading_duration};
+        // if (settings_manager.ObjectDumper.LoadAllAssetsBeforeDumpingObjects)
+        // {
+        //     Output::send(STR("Loading all assets...\n"));
+        //     double asset_loading_duration{};
+        //     {
+        //         ScopedTimer loading_timer{&asset_loading_duration};
 
-                UAssetRegistry::LoadAllAssets();
-            }
-            Output::send(STR("Loading all assets took {} seconds\n"), asset_loading_duration);
-        }
+        //         UAssetRegistry::LoadAllAssets();
+        //     }
+        //     Output::send(STR("Loading all assets took {} seconds\n"), asset_loading_duration);
+        // }
 
-        double dumper_duration{};
-        {
-            ScopedTimer dumper_timer{&dumper_duration};
+        // double dumper_duration{};
+        // {
+        //     ScopedTimer dumper_timer{&dumper_duration};
 
-            std::unordered_set<FField*> dumped_fields;
-            // There will be tons of dumped fields so lets just reserve tons in order to speed things up a bit
-            dumped_fields.reserve(100000);
+        //     std::unordered_set<FField*> dumped_fields;
+        //     // There will be tons of dumped fields so lets just reserve tons in order to speed things up a bit
+        //     dumped_fields.reserve(100000);
 
-            bool is_below_425 = Unreal::Version::IsBelow(4, 25);
+        //     bool is_below_425 = Unreal::Version::IsBelow(4, 25);
 
-            // The final outputted string shouldn't need be reformatted just to put a new line at the end
-            // Instead the object/property implementations should add a new line in the last format that they do
-            //
-            // Optimizations done:
-            // 1. The entire code-base has been changed to use 'wchar_t' instead of 'char'.
-            // The effect of this is that there is no need to ever convert between types.
-            // There's also no thinking about which type should be used since 'wchar_t' is now the standard for UE4SS.
-            // The downside with wchar_t is that all files that get output to will be doubled in size.
+        //     // The final outputted string shouldn't need be reformatted just to put a new line at the end
+        //     // Instead the object/property implementations should add a new line in the last format that they do
+        //     //
+        //     // Optimizations done:
+        //     // 1. The entire code-base has been changed to use 'wchar_t' instead of 'char'.
+        //     // The effect of this is that there is no need to ever convert between types.
+        //     // There's also no thinking about which type should be used since 'wchar_t' is now the standard for UE4SS.
+        //     // The downside with wchar_t is that all files that get output to will be doubled in size.
 
-            using ObjectDumperOutputDevice = Output::NewFileDevice;
-            Output::Targets<ObjectDumperOutputDevice> scoped_dumper_out;
-            auto& file_device = scoped_dumper_out.get_device<ObjectDumperOutputDevice>();
-            file_device.set_file_name_and_path(output_path_and_file_name);
-            file_device.set_formatter([](File::StringViewType string) -> File::StringType {
-                return File::StringType{string};
-            });
+        //     using ObjectDumperOutputDevice = Output::NewFileDevice;
+        //     Output::Targets<ObjectDumperOutputDevice> scoped_dumper_out;
+        //     auto& file_device = scoped_dumper_out.get_device<ObjectDumperOutputDevice>();
+        //     file_device.set_file_name_and_path(output_path_and_file_name);
+        //     file_device.set_formatter([](File::StringViewType string) -> File::StringType {
+        //         return File::StringType{string};
+        //     });
 
-            // Make string & reserve massive amounts of space to hopefully not reach the end of the string and require more
-            // dynamic allocations
-            StringType out_line;
-            out_line.reserve(200000000);
+        //     // Make string & reserve massive amounts of space to hopefully not reach the end of the string and require more
+        //     // dynamic allocations
+        //     StringType out_line;
+        //     out_line.reserve(200000000);
 
-            Output::send(STR("Dumping all objects & properties in GUObjectArray\n"));
-            UObjectGlobals::ForEachUObject([&](void* object, [[maybe_unused]] int32_t chunk_index, [[maybe_unused]] int32_t object_index) {
-                dump_uobject(static_cast<UObject*>(object), &dumped_fields, out_line, is_below_425);
-                return LoopAction::Continue;
-            });
+        //     Output::send(STR("Dumping all objects & properties in GUObjectArray\n"));
+        //     UObjectGlobals::ForEachUObject([&](void* object, [[maybe_unused]] int32_t chunk_index, [[maybe_unused]] int32_t object_index) {
+        //         dump_uobject(static_cast<UObject*>(object), &dumped_fields, out_line, is_below_425);
+        //         return LoopAction::Continue;
+        //     });
 
-            // Save to file
-            scoped_dumper_out.send(out_line);
+        //     // Save to file
+        //     scoped_dumper_out.send(out_line);
 
-            // Reset the dumped_fields set, otherwise no fields will be dumped in subsequent dumps
-            dumped_fields.clear();
-            Output::send(STR("Done iterating GUObjectArray\n"));
-        }
+        //     // Reset the dumped_fields set, otherwise no fields will be dumped in subsequent dumps
+        //     dumped_fields.clear();
+        //     Output::send(STR("Done iterating GUObjectArray\n"));
+        // }
 
-        UAssetRegistry::FreeAllForcefullyLoadedAssets();
-        Output::send(STR("Dumping GUObjectArray took {} seconds\n"), dumper_duration);
+        // UAssetRegistry::FreeAllForcefullyLoadedAssets();
+        // Output::send(STR("Dumping GUObjectArray took {} seconds\n"), dumper_duration);
         // Object & Property Dumper -> END
     }
 

@@ -5,7 +5,7 @@
 
 #include <Common.hpp>
 #include <File/File.hpp>
-#include <GUI/GUI.hpp>
+//#include <GUI/GUI.hpp>
 
 namespace RC
 {
@@ -31,7 +31,6 @@ namespace RC
         {
             int64_t MajorVersion{-1};
             int64_t MinorVersion{-1};
-            bool DebugBuild{false};
         } EngineVersionOverride;
 
         struct SectionObjectDumper
@@ -62,7 +61,7 @@ namespace RC
             bool DebugConsoleEnabled{true};
             bool DebugConsoleVisible{true};
             float DebugGUIFontScaling{1.0};
-            GUI::GfxBackend GraphicsAPI{GUI::GfxBackend::GLFW3_OpenGL3};
+            //GUI::GfxBackend GraphicsAPI{GUI::GfxBackend::GLFW3_OpenGL3};
         } Debug;
 
         struct SectionCrashDump

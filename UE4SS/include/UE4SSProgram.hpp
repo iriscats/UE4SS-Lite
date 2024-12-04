@@ -9,8 +9,6 @@
 #include <Common.hpp>
 #include <CrashDumper.hpp>
 #include <DynamicOutput/DynamicOutput.hpp>
-#include <GUI/GUI.hpp>
-#include <GUI/GUITab.hpp>
 #include <Input/Handler.hpp>
 #include <LuaLibrary.hpp>
 #include <MProgram.hpp>
@@ -24,21 +22,21 @@
 #include <String/StringType.hpp>
 
 // Used to set up ImGui context and allocator in DLL mods
-#define UE4SS_ENABLE_IMGUI()                                                                                                                                   \
-    /* Wait for UE4SS to create the imgui context. */                                                                                                          \
-    /* Without this, we're setting the context to nullptr and eventually crashing when we use any imgui functions. */                                          \
-    {                                                                                                                                                          \
-        while ((UE4SSProgram::settings_manager.Debug.DebugConsoleVisible || UE4SSProgram::get_program().m_render_thread.get_id() != std::jthread::id{}) &&     \
-               !UE4SSProgram::get_program().get_current_imgui_context())                                                                                       \
-        {                                                                                                                                                      \
-        }                                                                                                                                                      \
-        ImGui::SetCurrentContext(UE4SSProgram::get_current_imgui_context());                                                                                   \
-        ImGuiMemAllocFunc alloc_func{};                                                                                                                        \
-        ImGuiMemFreeFunc free_func{};                                                                                                                          \
-        void* user_data{};                                                                                                                                     \
-        UE4SSProgram::get_current_imgui_allocator_functions(&alloc_func, &free_func, &user_data);                                                              \
-        ImGui::SetAllocatorFunctions(alloc_func, free_func, user_data);                                                                                        \
-    }
+// #define UE4SS_ENABLE_IMGUI()                                                                                                                                   \
+//     /* Wait for UE4SS to create the imgui context. */                                                                                                          \
+//     /* Without this, we're setting the context to nullptr and eventually crashing when we use any imgui functions. */                                          \
+//     {                                                                                                                                                          \
+//         while ((UE4SSProgram::settings_manager.Debug.DebugConsoleVisible || UE4SSProgram::get_program().m_render_thread.get_id() != std::jthread::id{}) &&     \
+//                !UE4SSProgram::get_program().get_current_imgui_context())                                                                                       \
+//         {                                                                                                                                                      \
+//         }                                                                                                                                                      \
+//         ImGui::SetCurrentContext(UE4SSProgram::get_current_imgui_context());                                                                                   \
+//         ImGuiMemAllocFunc alloc_func{};                                                                                                                        \
+//         ImGuiMemFreeFunc free_func{};                                                                                                                          \
+//         void* user_data{};                                                                                                                                     \
+//         UE4SSProgram::get_current_imgui_allocator_functions(&alloc_func, &free_func, &user_data);                                                              \
+//         ImGui::SetAllocatorFunctions(alloc_func, free_func, user_data);                                                                                        \
+//     }
 
 namespace RC
 {
@@ -88,7 +86,7 @@ namespace RC
       public:
         constexpr static CharType m_settings_file_name[] = STR("UE4SS-settings.ini");
         constexpr static CharType m_log_file_name[] = STR("UE4SS.log");
-        constexpr static CharType m_object_dumper_file_name[] = STR("UE4SS_ObjectDump.txt");
+        //constexpr static CharType m_object_dumper_file_name[] = STR("UE4SS_ObjectDump.txt");
 
       public:
         RC_UE4SS_API static SettingsManager settings_manager;
@@ -121,7 +119,7 @@ namespace RC
         std::filesystem::path m_legacy_root_directory;
         Output::DebugConsoleDevice* m_debug_console_device{};
         Output::ConsoleDevice* m_console_device{};
-        GUI::DebuggingGUI m_debugging_gui{};
+        //GUI::DebuggingGUI m_debugging_gui{};
 
         using EventCallable = void (*)(void* data);
         struct Event
@@ -221,21 +219,21 @@ namespace RC
         RC_UE4SS_API auto generate_uht_compatible_headers() -> void;
         RC_UE4SS_API auto generate_cxx_headers(const std::filesystem::path& output_dir) -> void;
         RC_UE4SS_API auto generate_lua_types(const std::filesystem::path& output_dir) -> void;
-        auto get_debugging_ui() -> GUI::DebuggingGUI&
-        {
-            return m_debugging_gui;
-        };
-        auto stop_render_thread() -> void;
-        RC_UE4SS_API auto add_gui_tab(std::shared_ptr<GUI::GUITab> tab) -> void;
-        RC_UE4SS_API auto remove_gui_tab(std::shared_ptr<GUI::GUITab> tab) -> void;
-        RC_UE4SS_API static auto get_current_imgui_context() -> ImGuiContext*
-        {
-            return ImGui::GetCurrentContext();
-        }
-        RC_UE4SS_API static auto get_current_imgui_allocator_functions(ImGuiMemAllocFunc* alloc_func, ImGuiMemFreeFunc* free_func, void** user_data) -> void
-        {
-            return ImGui::GetAllocatorFunctions(alloc_func, free_func, user_data);
-        }
+        // auto get_debugging_ui() -> GUI::DebuggingGUI&
+        // {
+        //     return m_debugging_gui;
+        // };
+        // auto stop_render_thread() -> void;
+        // RC_UE4SS_API auto add_gui_tab(std::shared_ptr<GUI::GUITab> tab) -> void;
+        // RC_UE4SS_API auto remove_gui_tab(std::shared_ptr<GUI::GUITab> tab) -> void;
+        // RC_UE4SS_API static auto get_current_imgui_context() -> ImGuiContext*
+        // {
+        //     return ImGui::GetCurrentContext();
+        // }
+        // RC_UE4SS_API static auto get_current_imgui_allocator_functions(ImGuiMemAllocFunc* alloc_func, ImGuiMemFreeFunc* free_func, void** user_data) -> void
+        // {
+        //     return ImGui::GetAllocatorFunctions(alloc_func, free_func, user_data);
+        // }
         RC_UE4SS_API auto queue_event(EventCallable callable, void* data) -> void;
         RC_UE4SS_API auto is_queue_empty() -> bool;
         RC_UE4SS_API auto can_process_events() -> bool

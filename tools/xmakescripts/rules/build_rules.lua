@@ -41,7 +41,8 @@ local CONFIG_TYPES = {
         ["optimize"] = {"none"},
     },
     ["Shipping"] = {
-        ["symbols"] = {"debug"},
+        ["symbols"] = {"hidden"},
+        ["strip"] = {"all"},
         ["defines"] = {
             "UE_BUILD_SHIPPING"
         },
