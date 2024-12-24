@@ -11,7 +11,6 @@
 #include <ExceptionHandling.hpp>
 #include <Helpers/Format.hpp>
 #include <Helpers/String.hpp>
-#include <Mod/LuaMod.hpp>
 #include <Mod/Mod.hpp>
 #pragma warning(disable : 4005)
 #include <UE4SSProgram.hpp>

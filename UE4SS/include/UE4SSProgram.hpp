@@ -10,10 +10,8 @@
 #include <CrashDumper.hpp>
 #include <DynamicOutput/DynamicOutput.hpp>
 #include <Input/Handler.hpp>
-#include <LuaLibrary.hpp>
 #include <MProgram.hpp>
 #include <Mod/CppMod.hpp>
-#include <Mod/LuaMod.hpp>
 #include <Mod/Mod.hpp>
 #include <SettingsManager.hpp>
 #include <Unreal/Core/Containers/Array.hpp>
@@ -57,11 +55,6 @@ namespace RC
     {
         // Sha1 hash with no salt: "RecognizableString"
         char recognizable_string[41]{"81acd41b7490f7b70ec6455657855733e21d7c0e"};
-
-        LuaLibrary::SetScriptVariableInt32Signature set_script_variable_int32_function;
-        LuaLibrary::SetScriptVariableDefaultDataSignature set_script_variable_default_data_function;
-        LuaLibrary::CallScriptFunctionSignature call_script_function_function;
-        LuaLibrary::IsUE4SSInitializedSignature is_ue4ss_initialized_function;
 
         // Ensure that we have zero-initialized memory at the end of the struct
         // This means that we can reliably check whether a function exists externally
@@ -185,7 +178,6 @@ namespace RC
         auto create_simple_console() -> void;
         auto setup_unreal() -> void;
         auto load_unreal_offsets_from_file() -> void;
-        auto share_lua_functions() -> void;
         auto on_program_start() -> void;
         auto setup_unreal_properties() -> void;
 
@@ -199,7 +191,6 @@ namespace RC
         };
         auto start_cpp_mods(IsInitialStartup = IsInitialStartup::No) -> void;
         auto setup_mods() -> void;
-        auto start_lua_mods() -> void;
         auto uninstall_mods() -> void;
         auto fire_unreal_init_for_cpp_mods() -> void;
         auto fire_ui_init_for_cpp_mods() -> void;
@@ -216,24 +207,6 @@ namespace RC
         RC_UE4SS_API auto get_working_directory() -> File::StringType;
         RC_UE4SS_API auto get_mods_directory() -> File::StringType;
         RC_UE4SS_API auto get_legacy_root_directory() -> File::StringType;
-        RC_UE4SS_API auto generate_uht_compatible_headers() -> void;
-        RC_UE4SS_API auto generate_cxx_headers(const std::filesystem::path& output_dir) -> void;
-        RC_UE4SS_API auto generate_lua_types(const std::filesystem::path& output_dir) -> void;
-        // auto get_debugging_ui() -> GUI::DebuggingGUI&
-        // {
-        //     return m_debugging_gui;
-        // };
-        // auto stop_render_thread() -> void;
-        // RC_UE4SS_API auto add_gui_tab(std::shared_ptr<GUI::GUITab> tab) -> void;
-        // RC_UE4SS_API auto remove_gui_tab(std::shared_ptr<GUI::GUITab> tab) -> void;
-        // RC_UE4SS_API static auto get_current_imgui_context() -> ImGuiContext*
-        // {
-        //     return ImGui::GetCurrentContext();
-        // }
-        // RC_UE4SS_API static auto get_current_imgui_allocator_functions(ImGuiMemAllocFunc* alloc_func, ImGuiMemFreeFunc* free_func, void** user_data) -> void
-        // {
-        //     return ImGui::GetAllocatorFunctions(alloc_func, free_func, user_data);
-        // }
         RC_UE4SS_API auto queue_event(EventCallable callable, void* data) -> void;
         RC_UE4SS_API auto is_queue_empty() -> bool;
         RC_UE4SS_API auto can_process_events() -> bool
@@ -254,7 +227,6 @@ namespace RC
 
       private:
         static auto install_cpp_mods() -> void;
-        static auto install_lua_mods() -> void;
 
         using FMBNI_ExtraPredicate = std::function<bool(Mod*)>;
         static auto find_mod_by_name_internal(StringViewType mod_name,
@@ -279,13 +251,6 @@ namespace RC
             std::abort();
         };
         template <>
-        auto find_mod_by_name<LuaMod>(StringViewType mod_name, IsInstalled is_installed, IsStarted is_started) -> LuaMod*
-        {
-            return static_cast<LuaMod*>(find_mod_by_name_internal(mod_name, is_installed, is_started, [](auto elem) -> bool {
-                return dynamic_cast<LuaMod*>(elem);
-            }));
-        }
-        template <>
         auto find_mod_by_name<CppMod>(StringViewType mod_name, IsInstalled is_installed, IsStarted is_started) -> CppMod*
         {
             return static_cast<CppMod*>(find_mod_by_name_internal(mod_name, is_installed, is_started, [](auto elem) -> bool {
@@ -293,18 +258,11 @@ namespace RC
             }));
         }
         template <>
-        auto find_mod_by_name<LuaMod>(std::string_view mod_name, IsInstalled is_installed, IsStarted is_started) -> LuaMod*
-        {
-            return find_mod_by_name<LuaMod>(ensure_str(mod_name), is_installed, is_started);
-        }
-        template <>
         auto find_mod_by_name<CppMod>(std::string_view mod_name, IsInstalled is_installed, IsStarted is_started) -> CppMod*
         {
             return find_mod_by_name<CppMod>(ensure_str(mod_name), is_installed, is_started);
         }
 
-        RC_UE4SS_API static auto find_lua_mod_by_name(StringViewType mod_name, IsInstalled = IsInstalled::No, IsStarted = IsStarted::No) -> LuaMod*;
-        RC_UE4SS_API static auto find_lua_mod_by_name(std::string_view mod_name, IsInstalled = IsInstalled::No, IsStarted = IsStarted::No) -> LuaMod*;
         static auto static_cleanup() -> void;
         RC_UE4SS_API static auto get_program() -> UE4SSProgram&
         {

@@ -16,19 +16,12 @@
 #include <Profiler/Profiler.hpp>
 #include <DynamicOutput/DynamicOutput.hpp>
 #include <ExceptionHandling.hpp>
-// #include <GUI/ConsoleOutputDevice.hpp>
-// #include <GUI/GUI.hpp>
-// #include <GUI/LiveView.hpp>
 #include <Helpers/ASM.hpp>
 #include <Helpers/Format.hpp>
 #include <Helpers/Integer.hpp>
 #include <Helpers/String.hpp>
 #include <IniParser/Ini.hpp>
-#include <LuaLibrary.hpp>
-#include <LuaType/LuaCustomProperty.hpp>
-#include <LuaType/LuaUObject.hpp>
 #include <Mod/CppMod.hpp>
-#include <Mod/LuaMod.hpp>
 #include <Mod/Mod.hpp>
 #include <SigScanner/SinglePassSigScanner.hpp>
 #include <Signatures.hpp>
@@ -56,35 +49,6 @@
 
 namespace RC
 {
-    // Commented out because this system (turn off hotkeys when in-game console is open) it doesn't work properly.
-    /*
-    struct RC_UE_API FUEDeathListener : public Unreal::FUObjectCreateListener
-    {
-        static FUEDeathListener UEDeathListener;
-
-        void NotifyUObjectCreated(const Unreal::UObjectBase* object, int32_t index) override {}
-        void OnUObjectArrayShutdown() override
-        {
-            UE4SSProgram::unreal_is_shutting_down = true;
-            Unreal::UObjectArray::RemoveUObjectCreateListener(this);
-        }
-    };
-    FUEDeathListener FUEDeathListener::UEDeathListener{};
-
-    auto get_player_controller() -> UObject*
-    {
-        std::vector<Unreal::UObject*> player_controllers{};
-        UObjectGlobals::FindAllOf(STR("PlayerController"), player_controllers);
-        if (!player_controllers.empty())
-        {
-            return player_controllers.back();
-        }
-        else
-        {
-            return nullptr;
-        }
-    }
-    //*/
 
     SettingsManager UE4SSProgram::settings_manager{};
 
@@ -184,34 +148,11 @@ namespace RC
 
             m_crash_dumper.set_full_memory_dump(settings_manager.CrashDump.FullMemoryDump);
 
-            //m_debugging_gui.set_gfx_backend(settings_manager.Debug.GraphicsAPI);
-
             // Setup the log file
             auto& file_device = Output::set_default_devices<Output::NewFileDevice>();
             file_device.set_file_name_and_path(ensure_str((m_log_directory / m_log_file_name)));
 
             create_simple_console();
-
-            // if (settings_manager.Debug.DebugConsoleEnabled)
-            // {
-            //     m_console_device = &Output::set_default_devices<Output::ConsoleDevice>();
-            //     m_console_device->set_formatter([](File::StringViewType string) -> File::StringType {
-            //         return fmt::format(STR("[{}] {}"), fmt::format(STR("{:%X}"), std::chrono::system_clock::now()), string);
-            //     });
-            //     if (settings_manager.Debug.DebugConsoleVisible)
-            //     {
-            //         m_render_thread = std::jthread{&GUI::gui_thread, &m_debugging_gui};
-            //     }
-            // }
-
-            // This is experimental code that's here only for future reference
-            /*
-            Unreal::UnrealInitializer::SetupUnrealModules();
-
-            constexpr const wchar_t* str_to_find = STR("Allocator: %s");
-            void* string_address = SinglePassScanner::string_scan(str_to_find, ScanTarget::Core);
-            Output::send(STR("\n\nFound string '{}' at {}\n\n"), std::wstring_view{str_to_find}, string_address);
-            //*/
 
             Output::send(STR("Console created\n"));
             Output::send(STR("UE4SS - v{}.{}.{}{}{} - Git SHA #{}\n"),
@@ -336,8 +277,6 @@ namespace RC
             UAssetRegistry::SetMaxMemoryUsageDuringAssetLoading(settings_manager.Memory.MaxMemoryUsageDuringAssetLoading);
 
             output_all_member_offsets();
-
-            share_lua_functions();
 
             // Only deal with the event loop thread here if the 'Test' constructor doesn't need to be called
 #ifndef RUN_TESTS
@@ -558,9 +497,6 @@ namespace RC
                 config.ScanOverrides.version_finder = [&]([[maybe_unused]] auto&, Unreal::Signatures::ScanResult&) {};
             }
         }
-
-        // If any Lua scripts are found, add overrides so that the Lua script can perform the aob scan instead of the Unreal API itself
-        setup_lua_scan_overrides(m_working_directory, config);
 
         // Virtual function offset overrides
         TRY([&]() {
@@ -784,48 +720,10 @@ namespace RC
         }
     }
 
-    auto UE4SSProgram::share_lua_functions() -> void
-    {
-        m_shared_functions.set_script_variable_int32_function = &LuaLibrary::set_script_variable_int32;
-        m_shared_functions.set_script_variable_default_data_function = &LuaLibrary::set_script_variable_default_data;
-        m_shared_functions.call_script_function_function = &LuaLibrary::call_script_function;
-        m_shared_functions.is_ue4ss_initialized_function = &LuaLibrary::is_ue4ss_initialized;
-        Output::send(STR("m_shared_functions: {}\n"), static_cast<void*>(&m_shared_functions));
-    }
-
     auto UE4SSProgram::on_program_start() -> void
     {
         ProfilerScope();
         using namespace Unreal;
-
-        // Commented out because this system (turn off hotkeys when in-game console is open) it doesn't work properly.
-        /*
-        UObjectArray::AddUObjectCreateListener(&FUEDeathListener::UEDeathListener);
-        //*/
-
-        // if (settings_manager.Debug.DebugConsoleEnabled)
-        // {
-        //     if (settings_manager.General.UseUObjectArrayCache)
-        //     {
-        //         m_debugging_gui.get_live_view().set_listeners_allowed(true);
-        //     }
-        //     else
-        //     {
-        //         m_debugging_gui.get_live_view().set_listeners_allowed(false);
-        //     }
-
-        //     m_input_handler.register_keydown_event(Input::Key::O, {Input::ModifierKey::CONTROL}, [&]() {
-        //         TRY([&] {
-        //             auto was_gui_open = get_debugging_ui().is_open();
-        //             stop_render_thread();
-        //             if (!was_gui_open)
-        //             {
-        //                 m_render_thread = std::jthread{&GUI::gui_thread, &m_debugging_gui};
-        //                 fire_ui_init_for_cpp_mods();
-        //             }
-        //         });
-        //     });
-        // }
 
 #ifdef TIME_FUNCTION_MACRO_ENABLED
         m_input_handler.register_keydown_event(Input::Key::Y, {Input::ModifierKey::CONTROL}, [&]() {
@@ -844,7 +742,6 @@ namespace RC
 #endif
 
         TRY([&] {
-            //ObjectDumper::init();
 
             if (settings_manager.General.EnableHotReloadSystem)
             {
@@ -862,18 +759,9 @@ namespace RC
                         STR("FAssetData not available in <4.17, ignoring 'LoadAllAssetsBeforeDumpingObjects' & 'LoadAllAssetsBeforeGeneratingCXXHeaders'."));
             }
 
-            install_lua_mods();
-            LuaMod::on_program_start();
             fire_program_start_for_cpp_mods();
-            start_lua_mods();
         });
 
-        if (settings_manager.General.EnableDebugKeyBindings)
-        {
-            m_input_handler.register_keydown_event(Input::Key::NUM_NINE, {Input::ModifierKey::CONTROL}, [&]() {
-                generate_uht_compatible_headers();
-            });
-        }
     }
 
     auto UE4SSProgram::update() -> void
@@ -911,28 +799,6 @@ namespace RC
                                       m_queued_events.end());
             }
 
-            // Commented out because this system (turn off hotkeys when in-game console is open) it doesn't work properly.
-            /*
-            auto* player_controller = get_player_controller();
-            if (player_controller)
-            {
-                auto** player = player_controller->GetValuePtrByPropertyName<UObject*>(STR("Player"));
-                if (player && *player)
-                {
-                    auto** viewportclient = (*player)->GetValuePtrByPropertyName<UObject*>(STR("ViewportClient"));
-                    if (viewportclient && *viewportclient)
-                    {
-                        auto** console = (*viewportclient)->GetValuePtrByPropertyName<UObject*>(STR("ViewportConsole"));
-                        if (console && *console)
-                        {
-                            auto* console_state = std::bit_cast<FName*>(static_cast<uint8_t*>((*console)->GetValuePtrByPropertyNameInChain(STR("HistoryBuffer"))) + 0x70);
-                            m_input_handler.set_allow_input(console_state && *console_state == Unreal::NAME_None);
-                        }
-                    }
-                }
-            }
-            //*/
-
             m_input_handler.process_event();
 
             {
@@ -955,28 +821,6 @@ namespace RC
 
     auto UE4SSProgram::setup_unreal_properties() -> void
     {
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("ObjectProperty")).GetComparisonIndex(), &LuaType::push_objectproperty);
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("ClassProperty")).GetComparisonIndex(), &LuaType::push_classproperty);
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("Int8Property")).GetComparisonIndex(), &LuaType::push_int8property);
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("Int16Property")).GetComparisonIndex(), &LuaType::push_int16property);
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("IntProperty")).GetComparisonIndex(), &LuaType::push_intproperty);
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("Int64Property")).GetComparisonIndex(), &LuaType::push_int64property);
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("ByteProperty")).GetComparisonIndex(), &LuaType::push_byteproperty);
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("UInt16Property")).GetComparisonIndex(), &LuaType::push_uint16property);
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("UInt32Property")).GetComparisonIndex(), &LuaType::push_uint32property);
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("UInt64Property")).GetComparisonIndex(), &LuaType::push_uint64property);
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("StructProperty")).GetComparisonIndex(), &LuaType::push_structproperty);
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("ArrayProperty")).GetComparisonIndex(), &LuaType::push_arrayproperty);
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("FloatProperty")).GetComparisonIndex(), &LuaType::push_floatproperty);
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("DoubleProperty")).GetComparisonIndex(), &LuaType::push_doubleproperty);
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("BoolProperty")).GetComparisonIndex(), &LuaType::push_boolproperty);
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("EnumProperty")).GetComparisonIndex(), &LuaType::push_enumproperty);
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("WeakObjectProperty")).GetComparisonIndex(), &LuaType::push_weakobjectproperty);
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("NameProperty")).GetComparisonIndex(), &LuaType::push_nameproperty);
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("TextProperty")).GetComparisonIndex(), &LuaType::push_textproperty);
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("StrProperty")).GetComparisonIndex(), &LuaType::push_strproperty);
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("SoftClassProperty")).GetComparisonIndex(), &LuaType::push_softclassproperty);
-        LuaType::StaticState::m_property_value_pushers.emplace(FName(STR("InterfaceProperty")).GetComparisonIndex(), &LuaType::push_interfaceproperty);
     }
 
     auto UE4SSProgram::setup_mods() -> void
@@ -1014,8 +858,6 @@ namespace RC
             else
             {
                 // Create the mod but don't install it yet
-                if (std::filesystem::exists(sub_directory.path() / "scripts"))
-                    m_mods.emplace_back(std::make_unique<LuaMod>(*this, ensure_str(sub_directory.path().stem()), ensure_str(sub_directory.path())));
                 if (std::filesystem::exists(sub_directory.path() / "dlls"))
                     m_mods.emplace_back(std::make_unique<CppMod>(*this, ensure_str(sub_directory.path().stem()), ensure_str(sub_directory.path())));
             }
@@ -1063,11 +905,6 @@ namespace RC
     auto UE4SSProgram::install_cpp_mods() -> void
     {
         install_mods<CppMod>(get_program().m_mods);
-    }
-
-    auto UE4SSProgram::install_lua_mods() -> void
-    {
-        install_mods<LuaMod>(get_program().m_mods);
     }
 
     auto UE4SSProgram::fire_unreal_init_for_cpp_mods() -> void
@@ -1169,7 +1006,7 @@ namespace RC
 
                 if (!mod_enabled.empty() && mod_enabled[0] == STR('1'))
                 {
-                    Output::send(STR("Starting {} mod '{}'\n"), std::is_same_v<ModType, LuaMod> ? STR("Lua") : STR("C++"), mod->get_name().data());
+                    Output::send(STR("Starting {} mod '{}'\n"), STR("C++"), mod->get_name().data());
                     mod->start_mod();
                 }
                 else
@@ -1227,16 +1064,6 @@ namespace RC
         return {};
     }
 
-    auto UE4SSProgram::start_lua_mods() -> void
-    {
-        ProfilerScope();
-        auto error_message = start_mods<LuaMod>();
-        if (!error_message.empty())
-        {
-            set_error(error_message.c_str());
-        }
-    }
-
     auto UE4SSProgram::start_cpp_mods(IsInitialStartup is_initial_startup) -> void
     {
         ProfilerScope();
@@ -1259,23 +1086,12 @@ namespace RC
     {
         ProfilerScope();
         std::vector<CppMod*> cpp_mods{};
-        std::vector<LuaMod*> lua_mods{};
         for (auto& mod : m_mods)
         {
             if (auto cpp_mod = dynamic_cast<CppMod*>(mod.get()); cpp_mod)
             {
                 cpp_mods.emplace_back(cpp_mod);
             }
-            else if (auto lua_mod = dynamic_cast<LuaMod*>(mod.get()); lua_mod)
-            {
-                lua_mods.emplace_back(lua_mod);
-            }
-        }
-
-        for (auto& mod : lua_mods)
-        {
-            // Remove any actions, or we'll get an internal error as the lua ref won't be valid
-            mod->uninstall();
         }
 
         for (auto& mod : cpp_mods)
@@ -1284,7 +1100,6 @@ namespace RC
         }
 
         m_mods.clear();
-        LuaMod::global_uninstall();
     }
 
     auto UE4SSProgram::is_program_started() -> bool
@@ -1326,20 +1141,12 @@ namespace RC
             return were_all_events_registered_from_lua;
         });
 
-        // Remove all custom properties
-        // Uncomment when custom properties are working
-        LuaType::LuaCustomProperty::StaticStorage::property_list.clear();
-
-        // Reset the Lua callbacks for the global Lua function 'NotifyOnNewObject'
-        LuaMod::m_static_construct_object_lua_callbacks.clear();
-
         // Start processing events again as everything is now properly setup
         // Do this before mods are started or else you won't be able to use the hot-reload key bind if there's an error from Lua
         m_pause_events_processing = false;
 
         setup_mods();
         start_cpp_mods();
-        start_lua_mods();
 
         if (Unreal::UnrealInitializer::StaticStorage::bIsInitialized)
         {
@@ -1378,102 +1185,6 @@ namespace RC
     {
         return ensure_str(m_legacy_root_directory);
     }
-
-    auto UE4SSProgram::generate_uht_compatible_headers() -> void
-    {
-        // ProfilerScope();
-        // Output::send(STR("Generating UHT compatible headers...\n"));
-
-        // double generator_duration{};
-        // {
-        //     ScopedTimer generator_timer{&generator_duration};
-
-        //     const std::filesystem::path DumpRootDirectory = m_working_directory / "UHTHeaderDump";
-        //     UEGenerator::UEHeaderGenerator HeaderGenerator = UEGenerator::UEHeaderGenerator(DumpRootDirectory);
-        //     HeaderGenerator.dump_native_packages();
-        // }
-
-        // Output::send(STR("Generating UHT compatible headers took {} seconds\n"), generator_duration);
-    }
-
-    auto UE4SSProgram::generate_cxx_headers(const std::filesystem::path& output_dir) -> void
-    {
-        // ProfilerScope();
-        // if (settings_manager.CXXHeaderGenerator.LoadAllAssetsBeforeGeneratingCXXHeaders)
-        // {
-        //     Output::send(STR("Loading all assets...\n"));
-        //     double asset_loading_duration{};
-        //     {
-        //         ProfilerScopeNamed("loading all assets");
-        //         ScopedTimer loading_timer{&asset_loading_duration};
-
-        //         UAssetRegistry::LoadAllAssets();
-        //     }
-        //     Output::send(STR("Loading all assets took {} seconds\n"), asset_loading_duration);
-        // }
-
-        // double generator_duration;
-        // {
-        //     ProfilerScopeNamed("unloading all force-loaded assets");
-        //     ScopedTimer generator_timer{&generator_duration};
-
-        //     UEGenerator::generate_cxx_headers(output_dir);
-
-        //     Output::send(STR("Unloading all forcefully loaded assets\n"));
-        // }
-
-        // UAssetRegistry::FreeAllForcefullyLoadedAssets();
-        // Output::send(STR("SDK generated in {} seconds.\n"), generator_duration);
-    }
-
-    auto UE4SSProgram::generate_lua_types(const std::filesystem::path& output_dir) -> void
-    {
-        // ProfilerScope();
-        // if (settings_manager.CXXHeaderGenerator.LoadAllAssetsBeforeGeneratingCXXHeaders)
-        // {
-        //     Output::send(STR("Loading all assets...\n"));
-        //     double asset_loading_duration{};
-        //     {
-        //         ProfilerScopeNamed("loading all assets");
-        //         ScopedTimer loading_timer{&asset_loading_duration};
-
-        //         UAssetRegistry::LoadAllAssets();
-        //     }
-        //     Output::send(STR("Loading all assets took {} seconds\n"), asset_loading_duration);
-        // }
-
-        // double generator_duration;
-        // {
-        //     ProfilerScopeNamed("unloading all force-loaded assets");
-        //     ScopedTimer generator_timer{&generator_duration};
-
-        //     UEGenerator::generate_lua_types(output_dir);
-
-        //     Output::send(STR("Unloading all forcefully loaded assets\n"));
-        // }
-
-        // UAssetRegistry::FreeAllForcefullyLoadedAssets();
-        // Output::send(STR("SDK generated in {} seconds.\n"), generator_duration);
-    }
-
-    // auto UE4SSProgram::stop_render_thread() -> void
-    // {
-        // if (m_render_thread.joinable())
-        // {
-        //     m_render_thread.request_stop();
-        //     m_render_thread.join();
-        // }
-    //}
-
-    // auto UE4SSProgram::add_gui_tab(std::shared_ptr<GUI::GUITab> tab) -> void
-    // {
-        //m_debugging_gui.add_tab(tab);
-    //}
-
-    // auto UE4SSProgram::remove_gui_tab(std::shared_ptr<GUI::GUITab> tab) -> void
-    // {
-        //m_debugging_gui.remove_tab(tab);
-    //}
 
     auto UE4SSProgram::queue_event(EventCallable callable, void* data) -> void
     {
@@ -1553,16 +1264,6 @@ namespace RC
         }
     }
 
-    auto UE4SSProgram::find_lua_mod_by_name(std::string_view mod_name, UE4SSProgram::IsInstalled installed_only, IsStarted is_started) -> LuaMod*
-    {
-        return static_cast<LuaMod*>(find_mod_by_name<LuaMod>(mod_name, installed_only, is_started));
-    }
-
-    auto UE4SSProgram::find_lua_mod_by_name(StringViewType mod_name, UE4SSProgram::IsInstalled installed_only, IsStarted is_started) -> LuaMod*
-    {
-        return static_cast<LuaMod*>(find_mod_by_name<LuaMod>(mod_name, installed_only, is_started));
-    }
-
     auto UE4SSProgram::get_object_dumper_output_directory() -> const File::StringType
     {
         return ensure_str(m_object_dumper_output_directory);
@@ -1570,183 +1271,17 @@ namespace RC
 
     auto UE4SSProgram::dump_uobject(UObject* object, std::unordered_set<FField*>* in_dumped_fields, StringType& out_line, bool is_below_425) -> void
     {
-        // bool owns_dumped_fields{};
-        // auto dumped_fields_ptr = [&] {
-        //     if (in_dumped_fields)
-        //     {
-        //         return in_dumped_fields;
-        //     }
-        //     else
-        //     {
-        //         owns_dumped_fields = true;
-        //         return new std::unordered_set<FField*>{};
-        //     }
-        // }();
-        // auto& dumped_fields = *dumped_fields_ptr;
-
-        // UObject* typed_obj = static_cast<UObject*>(object);
-
-        // if (is_below_425 && Unreal::TypeChecker::is_property(typed_obj) &&
-        //     !typed_obj->HasAnyFlags(static_cast<EObjectFlags>(EObjectFlags::RF_DefaultSubObject | EObjectFlags::RF_ArchetypeObject)))
-        // {
-        //     // We've verified that we're in <4.25 so this cast is safe but should be abstracted at some point
-        //     dump_xproperty(std::bit_cast<FProperty*>(typed_obj), out_line);
-        // }
-        // else
-        // {
-        //     auto typed_class = typed_obj->GetClassPrivate()->HashObject();
-        //     if (ObjectDumper::to_string_exists(typed_class))
-        //     {
-        //         // Call type-specific implementation to dump UObject
-        //         // The type is determined at runtime
-
-        //         // Dump UObject
-        //         ObjectDumper::get_to_string(typed_class)(object, out_line);
-        //         out_line.append(STR("\n"));
-
-        //         if (!is_below_425 && ObjectDumper::to_string_complex_exists(typed_class))
-        //         {
-        //             // Dump all properties that are directly owned by this UObject (not its UClass)
-        //             // UE 4.25+ (properties are part of GUObjectArray in earlier versions)
-        //             ObjectDumper::get_to_string_complex(typed_class)(object, out_line, [&](void* prop) {
-        //                 if (dumped_fields.contains(static_cast<FField*>(prop)))
-        //                 {
-        //                     return;
-        //                 }
-
-        //                 dump_xproperty(static_cast<FProperty*>(prop), out_line);
-        //                 dumped_fields.emplace(static_cast<FField*>(prop));
-        //             });
-        //         }
-        //     }
-        //     else
-        //     {
-        //         // A type-specific implementation does not exist so lets call the default implementation for UObjects instead
-        //         ObjectDumper::object_to_string(object, out_line);
-        //         out_line.append(STR("\n"));
-        //     }
-
-        //     // If the UClass of the UObject has any properties then dump them
-        //     // UE 4.25+ (properties are part of GUObjectArray in earlier versions)
-        //     if (!is_below_425)
-        //     {
-        //         if (typed_obj->IsA<UStruct>())
-        //         {
-        //             for (FProperty* prop : static_cast<UClass*>(typed_obj)->ForEachProperty())
-        //             {
-        //                 if (dumped_fields.contains(prop))
-        //                 {
-        //                     continue;
-        //                 }
-
-        //                 dump_xproperty(prop, out_line);
-        //                 dumped_fields.emplace(prop);
-        //             }
-        //         }
-        //     }
-        // }
-
-        // if (owns_dumped_fields)
-        // {
-        //     delete dumped_fields_ptr;
-        // }
+    
     }
 
     auto UE4SSProgram::dump_xproperty(FProperty* property, StringType& out_line) -> void
     {
-        // auto typed_prop_class = property->GetClass().HashObject();
 
-        // if (ObjectDumper::to_string_exists(typed_prop_class))
-        // {
-        //     ObjectDumper::get_to_string(typed_prop_class)(property, out_line);
-        //     out_line.append(STR("\n"));
-
-        //     if (ObjectDumper::to_string_complex_exists(typed_prop_class))
-        //     {
-        //         ObjectDumper::get_to_string_complex(typed_prop_class)(property, out_line, [&]([[maybe_unused]] void* prop) {
-        //             out_line.append(STR("\n"));
-        //         });
-        //     }
-        // }
-        // else
-        // {
-        //     ObjectDumper::property_to_string(property, out_line);
-        //     out_line.append(STR("\n"));
-        // }
     }
 
     auto UE4SSProgram::dump_all_objects_and_properties(const File::StringType& output_path_and_file_name) -> void
     {
-        /*
-        Output::send(STR("Test msg with no fmt args, and no optional arg\n"));
-        Output::send(STR("Test msg with no fmt args, and one optional arg [Normal]\n"), LogLevel::Normal);
-        Output::send(STR("Test msg with no fmt args, and one optional arg [Verbose]\n"), LogLevel::Verbose);
-        Output::send(STR("Test msg with one fmt arg [{}], and one optional arg [Warning]\n"), LogLevel::Warning, 33);
-        Output::send(STR("Test msg with two fmt args [{}, {}], and one optional arg [Error]\n"), LogLevel::Error, 33, 44);
-        //*/
-
-        // Object & Property Dumper -> START
-        // if (settings_manager.ObjectDumper.LoadAllAssetsBeforeDumpingObjects)
-        // {
-        //     Output::send(STR("Loading all assets...\n"));
-        //     double asset_loading_duration{};
-        //     {
-        //         ScopedTimer loading_timer{&asset_loading_duration};
-
-        //         UAssetRegistry::LoadAllAssets();
-        //     }
-        //     Output::send(STR("Loading all assets took {} seconds\n"), asset_loading_duration);
-        // }
-
-        // double dumper_duration{};
-        // {
-        //     ScopedTimer dumper_timer{&dumper_duration};
-
-        //     std::unordered_set<FField*> dumped_fields;
-        //     // There will be tons of dumped fields so lets just reserve tons in order to speed things up a bit
-        //     dumped_fields.reserve(100000);
-
-        //     bool is_below_425 = Unreal::Version::IsBelow(4, 25);
-
-        //     // The final outputted string shouldn't need be reformatted just to put a new line at the end
-        //     // Instead the object/property implementations should add a new line in the last format that they do
-        //     //
-        //     // Optimizations done:
-        //     // 1. The entire code-base has been changed to use 'wchar_t' instead of 'char'.
-        //     // The effect of this is that there is no need to ever convert between types.
-        //     // There's also no thinking about which type should be used since 'wchar_t' is now the standard for UE4SS.
-        //     // The downside with wchar_t is that all files that get output to will be doubled in size.
-
-        //     using ObjectDumperOutputDevice = Output::NewFileDevice;
-        //     Output::Targets<ObjectDumperOutputDevice> scoped_dumper_out;
-        //     auto& file_device = scoped_dumper_out.get_device<ObjectDumperOutputDevice>();
-        //     file_device.set_file_name_and_path(output_path_and_file_name);
-        //     file_device.set_formatter([](File::StringViewType string) -> File::StringType {
-        //         return File::StringType{string};
-        //     });
-
-        //     // Make string & reserve massive amounts of space to hopefully not reach the end of the string and require more
-        //     // dynamic allocations
-        //     StringType out_line;
-        //     out_line.reserve(200000000);
-
-        //     Output::send(STR("Dumping all objects & properties in GUObjectArray\n"));
-        //     UObjectGlobals::ForEachUObject([&](void* object, [[maybe_unused]] int32_t chunk_index, [[maybe_unused]] int32_t object_index) {
-        //         dump_uobject(static_cast<UObject*>(object), &dumped_fields, out_line, is_below_425);
-        //         return LoopAction::Continue;
-        //     });
-
-        //     // Save to file
-        //     scoped_dumper_out.send(out_line);
-
-        //     // Reset the dumped_fields set, otherwise no fields will be dumped in subsequent dumps
-        //     dumped_fields.clear();
-        //     Output::send(STR("Done iterating GUObjectArray\n"));
-        // }
-
-        // UAssetRegistry::FreeAllForcefullyLoadedAssets();
-        // Output::send(STR("Dumping GUObjectArray took {} seconds\n"), dumper_duration);
-        // Object & Property Dumper -> END
+    
     }
 
     auto UE4SSProgram::static_cleanup() -> void

@@ -73,3 +73,4 @@ _ReSharper*/
 
 # xmake generated projects
 vsxmake2022
+.DS_Store

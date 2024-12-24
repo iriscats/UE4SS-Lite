@@ -66,7 +66,7 @@ target(projectName)
 
     add_deps(
         "File", "DynamicOutput", "Unreal",
-        "SinglePassSigScanner", "LuaMadeSimple", "Function",
+        "SinglePassSigScanner", "Function",
         "IniParser", "JSON", "Input",
         "Constructs", "Helpers", "MProgram",
         "ScopedTimer", "Profiler", "patternsleuth_bind",

@@ -32,10 +32,6 @@
         "mod_enabled": true
     },
     {
-        "mod_name": "jsbLuaProfilerMod",
-        "mod_enabled": false
-    },
-    {
         "mod_name": "Keybinds",
         "mod_enabled": true
     }

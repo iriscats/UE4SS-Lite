@@ -85,14 +85,6 @@ namespace RC
         REGISTER_FLOAT_SETTING(Debug.DebugGUIFontScaling, section_debug, GuiConsoleFontScaling)
         StringType graphics_api_string{};
         REGISTER_STRING_SETTING(graphics_api_string, section_debug, GraphicsAPI)
-        // if (String::iequal(graphics_api_string, STR("DX11")) || String::iequal(graphics_api_string, STR("D3D11")))
-        // {
-        //     Debug.GraphicsAPI = GUI::GfxBackend::DX11;
-        // }
-        // else if (String::iequal(graphics_api_string, STR("OpenGL")))
-        // {
-        //     Debug.GraphicsAPI = GUI::GfxBackend::GLFW3_OpenGL3;
-        // }
 
         constexpr static File::CharType section_crash_dump[] = STR("CrashDump");
         REGISTER_BOOL_SETTING(CrashDump.EnableDumping, section_crash_dump, EnableDumping);
