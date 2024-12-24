@@ -32,7 +32,7 @@ option("versionCheck")
 
     set_description("Will xmake check the installed MSVC and Rust versions on configuration step")
 
-local projectName = "UE4SS"
+local projectName = "UE4SSL"
 
 local function parse_version_string(str)
     local matches = {}

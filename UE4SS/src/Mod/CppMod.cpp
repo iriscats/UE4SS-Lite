@@ -12,7 +12,8 @@ namespace RC
 {
     CppMod::CppMod(UE4SSProgram& program, StringType&& mod_name, StringType&& mod_path) : Mod(program, std::move(mod_name), std::move(mod_path))
     {
-        m_dlls_path = m_mod_path / STR("dlls");
+        // m_dlls_path = m_mod_path / STR("dlls");
+        m_dlls_path = m_mod_path;
 
         if (!std::filesystem::exists(m_dlls_path))
         {
