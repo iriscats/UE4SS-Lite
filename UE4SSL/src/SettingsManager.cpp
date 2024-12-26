@@ -2,7 +2,7 @@
 #include <IniParser/Ini.hpp>
 #include <SettingsManager.hpp>
 
-'''
+auto default_setting = LR""""(
 [General]
 EnableHotReloadSystem = 0
 UseCache = 1
@@ -32,7 +32,7 @@ FExecVTableOffsetInLocalPlayer = 0x28
 [CrashDump]
 EnableDumping = 0
 FullMemoryDump = 0
-'''
+)"""";
 
 
 #define REGISTER_STRING_SETTING(member_var, section_name, key)                                                                                                 \
@@ -75,10 +75,13 @@ namespace RC
 {
     auto SettingsManager::deserialize(std::filesystem::path& file_name) -> void
     {
-        auto file = File::open(file_name, File::OpenFor::Reading, File::OverwriteExistingFile::No, File::CreateIfNonExistent::Yes);
+
+        //auto file = File::open(file_name, File::OpenFor::Reading, File::OverwriteExistingFile::No, File::CreateIfNonExistent::Yes);
+         
+        StringType setting(default_setting);
         Ini::Parser parser;
-        parser.parse(file);
-        file.close();
+        parser.parse(setting);
+        //file.close();
 
         // constexpr static File::CharType section_overrides[] = STR("Overrides");
         // REGISTER_STRING_SETTING(Overrides.ModsFolderPath, section_overrides, ModsFolderPath)

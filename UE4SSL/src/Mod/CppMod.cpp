@@ -14,6 +14,7 @@ namespace RC
     {
         // m_dlls_path = m_mod_path / STR("dlls");
         m_dlls_path = m_mod_path;
+        //Output::send<LogLevel::Warning>(STR("m_dlls_path {}\n"), m_dlls_path.c_str());
 
         if (!std::filesystem::exists(m_dlls_path))
         {
@@ -23,6 +24,8 @@ namespace RC
         }
 
         auto dll_path = m_dlls_path / STR("main.dll");
+       //Output::send<LogLevel::Warning>(STR("dll_path {}\n"), dll_path.c_str());
+
         // Add mods dlls directory to search path for dynamic/shared linked libraries in mods
         m_dlls_path_cookie = AddDllDirectory(m_dlls_path.c_str());
         m_main_dll_module = LoadLibraryExW(dll_path.c_str(), NULL, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);

@@ -230,7 +230,7 @@ rule("ue4ss.mod")
         target:set("kind", "shared")
         target:set("languages", "cxx23")
         target:set("exceptions", "cxx")
-        target:add("deps", "UE4SS")
+        target:add("deps", "UE4SSL")
         target:set("group", "mods")
     end)
 

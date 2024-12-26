@@ -224,7 +224,7 @@ namespace RC
             Output::send(STR("game executable: {} ({} bytes)\n\n\n"), ensure_str(m_game_path_and_exe_name), std::filesystem::file_size(m_game_path_and_exe_name));
             Output::send(STR("mods directory: {}\n"), ensure_str(m_mods_directory));
             Output::send(STR("log directory: {}\n"), ensure_str(m_log_directory));
-            Output::send(STR("object dumper directory: {}\n\n\n"), ensure_str(m_object_dumper_output_directory));
+            //Output::send(STR("object dumper directory: {}\n\n\n"), ensure_str(m_object_dumper_output_directory));
         }
         catch (std::runtime_error& e)
         {
@@ -858,7 +858,7 @@ namespace RC
             else
             {
                 // Create the mod but don't install it yet
-                if (std::filesystem::exists(sub_directory.path() / "dlls"))
+                if (std::filesystem::exists(sub_directory.path() / "main.dll"))
                     m_mods.emplace_back(std::make_unique<CppMod>(*this, ensure_str(sub_directory.path().stem()), ensure_str(sub_directory.path())));
             }
         }
@@ -1037,10 +1037,10 @@ namespace RC
             //     continue;
             // }
 
-            if (ec.value() != 0)
-            {
-                return fmt::format("exists ran into error {}", ec.value());
-            }
+            //if (ec.value() != 0)
+            //{
+            //    return fmt::format("exists ran into error {}", ec.value());
+            //}
 
             auto mod = UE4SSProgram::find_mod_by_name<ModType>(ensure_str(mod_directory.path().stem()), UE4SSProgram::IsInstalled::Yes);
             if (!dynamic_cast<ModType*>(mod))

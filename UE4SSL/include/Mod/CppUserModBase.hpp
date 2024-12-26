@@ -24,9 +24,6 @@ namespace RC
     // This includes them being compiled in different configurations (Debug/Release).
     class CppUserModBase
     {
-      protected:
-        //std::vector<std::shared_ptr<GUI::GUITab>> GUITabs{};
-
       public:
         StringType ModName{};
         StringType ModVersion{};
