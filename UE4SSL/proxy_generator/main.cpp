@@ -196,7 +196,7 @@ int _tmain(int argc, TCHAR* argv[])
     cpp_file << "    wchar_t moduleFilenameBuffer[1024]{'\\0'};" << endl;
     cpp_file << "    GetModuleFileNameW(moduleHandle, moduleFilenameBuffer, sizeof(moduleFilenameBuffer) / sizeof(wchar_t));" << endl;
     cpp_file << "    const auto currentPath = std::filesystem::path(moduleFilenameBuffer).parent_path();" << endl;
-    cpp_file << "    const fs::path ue4ssPath = currentPath / \"ue4ss\" / \"UE4SS.dll\";" << endl;
+    cpp_file << "    const fs::path ue4ssPath = currentPath / \"ue4ss\" / \"UE4SSL.dll\";" << endl;
     cpp_file << endl;
 
     cpp_file << "    // Check for override.txt" << endl;
@@ -249,7 +249,7 @@ int _tmain(int argc, TCHAR* argv[])
     cpp_file << "        }" << endl;
     cpp_file << "        else" << endl;
     cpp_file << "        {" << endl;
-    cpp_file << "            MessageBox(nullptr, L\"Failed to load UE4SS.dll. Please see the docs on correct installation: https://docs.ue4ss.com/installation-guide\", L\"UE4SS Error\", MB_OK | MB_ICONERROR);" << endl;
+    cpp_file << "            MessageBox(nullptr, L\"Failed to load UE4SSL.dll. Please see the docs on correct installation: https://docs.ue4ss.com/installation-guide\", L\"UE4SS Error\", MB_OK | MB_ICONERROR);" << endl;
     cpp_file << "            ExitProcess(0);" << endl;
     cpp_file << "        }" << endl;
     cpp_file << "    }" << endl;

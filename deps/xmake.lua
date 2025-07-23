@@ -1,7 +1,7 @@
 -- First party dependencies
 includes("first")
 -- Third party dependencies
-includes("third")
+-- includes("third")
 -- Third party dependencies repository
 -- Everything that is an xmake package should be inside of this repository
 add_repositories("third-party deps/third-repo", { rootdir = get_config("ue4ssRoot") })

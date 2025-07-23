@@ -7,7 +7,7 @@
 #include <Psapi.h>
 
 #include <fmt/core.h>
-#include <Profiler/Profiler.hpp>
+//#include <Profiler/Profiler.hpp>
 #include <SigScanner/SinglePassSigScanner.hpp>
 
 namespace RC
@@ -491,8 +491,8 @@ namespace RC
     auto SinglePassScanner::scanner_work_thread(uint8_t* start_address, uint8_t* end_address, SYSTEM_INFO& info, std::vector<SignatureContainer>& signature_containers)
             -> void
     {
-        ProfilerSetThreadName("UE4SS-ScannerWorkThread");
-        ProfilerScope();
+        // ProfilerSetThreadName("UE4SS-ScannerWorkThread");
+        // ProfilerScope();
 
         switch (m_scan_method)
         {
@@ -510,7 +510,7 @@ namespace RC
                                                        SYSTEM_INFO& info,
                                                        std::vector<SignatureContainer>& signature_containers) -> void
     {
-        ProfilerScope();
+        // ProfilerScope();
         if (!start_address)
         {
             start_address = static_cast<uint8_t*>(info.lpMinimumApplicationAddress);
@@ -690,7 +690,7 @@ namespace RC
                                                         SYSTEM_INFO& info,
                                                         std::vector<SignatureContainer>& signature_containers) -> void
     {
-        ProfilerScope();
+        // ProfilerScope();
 
         if (!start_address)
         {

@@ -69,8 +69,10 @@ target(projectName)
         "SinglePassSigScanner", "Function",
         "IniParser", "JSON", "Input",
         "Constructs", "Helpers", "MProgram",
-        "ScopedTimer", "Profiler", "patternsleuth_bind",
-        "glad", { public = true }
+        -- "ScopedTimer", "Profiler", 
+        "patternsleuth_bind",
+        -- "glad", 
+        { public = true }
     )
     
     add_packages("fmt", { public = true })

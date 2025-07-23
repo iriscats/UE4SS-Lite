@@ -13,7 +13,7 @@
 #include <limits>
 #include <unordered_set>
 #include <fmt/chrono.h>
-#include <Profiler/Profiler.hpp>
+// #include <Profiler/Profiler.hpp>
 #include <DynamicOutput/DynamicOutput.hpp>
 #include <ExceptionHandling.hpp>
 #include <Helpers/ASM.hpp>
@@ -25,7 +25,7 @@
 #include <Mod/Mod.hpp>
 #include <SigScanner/SinglePassSigScanner.hpp>
 #include <Signatures.hpp>
-#include <Timer/ScopedTimer.hpp>
+// #include <Timer/ScopedTimer.hpp>
 #include <UE4SSProgram.hpp>
 #include <Unreal/AGameMode.hpp>
 #include <Unreal/AGameModeBase.hpp>
@@ -124,7 +124,7 @@ namespace RC
 
     UE4SSProgram::UE4SSProgram(const std::filesystem::path& moduleFilePath, std::initializer_list<BinaryOptions> options) : MProgram(options)
     {
-        ProfilerScope();
+        // ProfilerScope();
         s_program = this;
 
         try
@@ -252,8 +252,8 @@ namespace RC
 
     auto UE4SSProgram::init() -> void
     {
-        ProfilerSetThreadName("UE4SS-InitThread");
-        ProfilerScope();
+        // ProfilerSetThreadName("UE4SS-InitThread");
+        // ProfilerScope();();
 
         try
         {
@@ -305,7 +305,7 @@ namespace RC
 
     auto UE4SSProgram::setup_paths(const std::filesystem::path& moduleFilePath) -> void
     {
-        ProfilerScope();
+        // ProfilerScope();();
         m_root_directory = moduleFilePath.parent_path();
         m_module_file_path = moduleFilePath;
 
@@ -434,7 +434,7 @@ namespace RC
 
     auto UE4SSProgram::setup_unreal() -> void
     {
-        ProfilerScope();
+        // ProfilerScope();();
         // Retrieve offsets from the config file
         const StringType offset_overrides_section{STR("OffsetOverrides")};
 
@@ -500,7 +500,7 @@ namespace RC
 
         // Virtual function offset overrides
         TRY([&]() {
-            ProfilerScopeNamed("loading virtual function offset overrides");
+            // ProfilerScope();Named("loading virtual function offset overrides");
             static File::StringType virtual_function_offset_override_file{ensure_str((m_working_directory / STR("VTableLayout.ini")))};
             if (std::filesystem::exists(virtual_function_offset_override_file))
             {
@@ -722,7 +722,7 @@ namespace RC
 
     auto UE4SSProgram::on_program_start() -> void
     {
-        ProfilerScope();
+        // ProfilerScope();();
         using namespace Unreal;
 
 #ifdef TIME_FUNCTION_MACRO_ENABLED
@@ -766,7 +766,7 @@ namespace RC
 
     auto UE4SSProgram::update() -> void
     {
-        ProfilerSetThreadName("UE4SS-UpdateThread");
+        //ProfilerSetThreadName("UE4SS-UpdateThread");
 
         on_program_start();
 
@@ -780,7 +780,7 @@ namespace RC
 
             if (!is_queue_empty())
             {
-                ProfilerScopeNamed("event processing");
+                // ProfilerScope();Named("event processing");
 
                 static constexpr size_t max_events_executed_per_frame = 5;
                 size_t num_events_executed{};
@@ -802,7 +802,7 @@ namespace RC
             m_input_handler.process_event();
 
             {
-                ProfilerScopeNamed("mod update processing");
+                // ProfilerScope();Named("mod update processing");
 
                 for (auto& mod : m_mods)
                 {
@@ -814,7 +814,7 @@ namespace RC
             }
 
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
-            ProfilerFrameMark();
+            //ProfilerFrameMark();
         }
         Output::send(STR("Event loop end\n"));
     }
@@ -825,7 +825,7 @@ namespace RC
 
     auto UE4SSProgram::setup_mods() -> void
     {
-        ProfilerScope();
+        // ProfilerScope();();
 
         Output::send(STR("Setting up mods...\n"));
 
@@ -867,7 +867,7 @@ namespace RC
     template <typename ModType>
     auto install_mods(std::vector<std::unique_ptr<Mod>>& mods) -> void
     {
-        ProfilerScope();
+        // ProfilerScope();();
         for (auto& mod : mods)
         {
             if (!dynamic_cast<ModType*>(mod.get()))
@@ -909,7 +909,7 @@ namespace RC
 
     auto UE4SSProgram::fire_unreal_init_for_cpp_mods() -> void
     {
-        ProfilerScope();
+        // ProfilerScope();();
         for (const auto& mod : m_mods)
         {
             if (!dynamic_cast<CppMod*>(mod.get()))
@@ -922,7 +922,7 @@ namespace RC
 
     auto UE4SSProgram::fire_ui_init_for_cpp_mods() -> void
     {
-        ProfilerScope();
+        // ProfilerScope();();
         for (const auto& mod : m_mods)
         {
             if (!dynamic_cast<CppMod*>(mod.get()))
@@ -935,7 +935,7 @@ namespace RC
 
     auto UE4SSProgram::fire_program_start_for_cpp_mods() -> void
     {
-        ProfilerScope();
+        // ProfilerScope();();
         for (const auto& mod : m_mods)
         {
             if (!dynamic_cast<CppMod*>(mod.get()))
@@ -960,7 +960,7 @@ namespace RC
     template <typename ModType>
     auto start_mods() -> std::string
     {
-        ProfilerScope();
+        // ProfilerScope();();
         // Part #1: Start all mods that are enabled in mods.txt.
         Output::send(STR("Starting mods (from mods.txt load order)...\n"));
 
@@ -1067,7 +1067,7 @@ namespace RC
 
     auto UE4SSProgram::start_cpp_mods(IsInitialStartup is_initial_startup) -> void
     {
-        ProfilerScope();
+        // ProfilerScope();();
         auto error_message = start_mods<CppMod>();
         if (!error_message.empty())
         {
@@ -1085,7 +1085,7 @@ namespace RC
 
     auto UE4SSProgram::uninstall_mods() -> void
     {
-        ProfilerScope();
+        // ProfilerScope();();
         std::vector<CppMod*> cpp_mods{};
         for (auto& mod : m_mods)
         {
@@ -1110,7 +1110,7 @@ namespace RC
 
     auto UE4SSProgram::reinstall_mods() -> void
     {
-        ProfilerScope();
+        // ProfilerScope();();
         Output::send(STR("Re-installing all mods\n"));
 
         // Stop processing events while stuff isn't properly setup

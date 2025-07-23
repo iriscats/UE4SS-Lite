@@ -11,7 +11,7 @@ SecondsToScanBeforeGivingUp = 30
 bUseUObjectArrayCache = true
 
 [Debug]
-ConsoleEnabled = 0
+ConsoleEnabled = 1
 
 [Threads]
 SigScannerNumThreads = 8

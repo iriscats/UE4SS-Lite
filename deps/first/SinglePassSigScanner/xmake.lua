@@ -11,5 +11,5 @@ target(projectName)
 
     add_files("src/**.cpp")
     
-    add_deps("Profiler")
+    -- add_deps("Profiler")
     add_packages("fmt")
