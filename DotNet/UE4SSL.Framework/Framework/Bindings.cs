@@ -207,15 +207,15 @@ partial struct WeakObjectPtr
 }
 
 static partial class Debug {
-	[DllImport("UE4SSL.dll", EntryPoint = "?Log@Debug@Framework@DotNetLibrary@RC@@SAXW4LogLevel@54@PEBD@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?Log@Debug@Framework@DotNetLibrary@RC@@SAXW4LogLevel@54@PEBD@Z")]
 	private static extern void Log(LogLevel level, byte[] message);
 }
 
 static partial class Runtime
 {
-	[DllImport("UE4SSL.dll", EntryPoint = "?add_unreal_init_callback@Runtime@DotNetLibrary@RC@@SAXP6AXXZ@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?add_unreal_init_callback@Runtime@DotNetLibrary@RC@@SAXP6AXXZ@Z")]
 	private static extern unsafe void AddUnrealInitCallbackInternal(delegate* unmanaged[Cdecl]<void> callback);
-	[DllImport("UE4SSL.dll", EntryPoint = "?add_update_callback@Runtime@DotNetLibrary@RC@@SAXP6AXXZ@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?add_update_callback@Runtime@DotNetLibrary@RC@@SAXP6AXXZ@Z")]
 	private static extern unsafe void AddUpdateCallbackInternal(delegate* unmanaged[Cdecl]<void> callback);
 }
 
@@ -224,144 +224,144 @@ static partial class Hooking
 	[UnmanagedFunctionPointer(CallingConvention.ThisCall)]
 	public unsafe delegate void UFunctionCallback(IntPtr @this, void*[] @params, void* retValue);
 	
-	[DllImport("UE4SSL.dll", EntryPoint = "?SigScan@Hooking@Framework@DotNetLibrary@RC@@SA_JPEBD@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?SigScan@Hooking@Framework@DotNetLibrary@RC@@SA_JPEBD@Z")]
 	private static extern IntPtr SigScan(byte[] signature);
-	[DllImport("UE4SSL.dll", EntryPoint = "?Hook@Hooking@Framework@DotNetLibrary@RC@@SAPEAVx64Detour@PLH@@_K0PEA_K@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?Hook@Hooking@Framework@DotNetLibrary@RC@@SAPEAVx64Detour@PLH@@_K0PEA_K@Z")]
 	private static extern IntPtr HookInternal(IntPtr address, IntPtr hook, ref IntPtr original);
-	[DllImport("UE4SSL.dll", EntryPoint = "?HookUFunction@Hooking@Framework@DotNetLibrary@RC@@SA?AUCallbackIds@234@PEAVUFunction@Unreal@4@P6AXPEAVUObject@74@PEAPEAXPEAX@Z4@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?HookUFunction@Hooking@Framework@DotNetLibrary@RC@@SA?AUCallbackIds@234@PEAVUFunction@Unreal@4@P6AXPEAVUObject@74@PEAPEAXPEAX@Z4@Z")]
 	private static extern long HookUFunction(IntPtr function, IntPtr preCallback, IntPtr postCallback);
-	[DllImport("UE4SSL.dll", EntryPoint = "?Unhook@Hooking@Framework@DotNetLibrary@RC@@SAXPEAVx64Detour@PLH@@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?Unhook@Hooking@Framework@DotNetLibrary@RC@@SAXPEAVx64Detour@PLH@@@Z")]
 	private static extern void UnhookInternal(IntPtr hook);
-	[DllImport("UE4SSL.dll", EntryPoint = "?UnhookUFunction@Hooking@Framework@DotNetLibrary@RC@@SAXPEAVUFunction@Unreal@4@UCallbackIds@234@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?UnhookUFunction@Hooking@Framework@DotNetLibrary@RC@@SAXPEAVUFunction@Unreal@4@UCallbackIds@234@@Z")]
 	private static extern bool UnhookUFunction(IntPtr function, long callbackIds);
 }
 
 internal static class Object
 {
-	[DllImport("UE4SSL.dll", EntryPoint = "?IsValid@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?IsValid@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@@Z")]
 	internal static extern bool IsValid(IntPtr @object);
-	[DllImport("UE4SSL.dll", EntryPoint = "?Invoke@Object@Framework@DotNetLibrary@RC@@SAXPEAVUObject@Unreal@4@PEAVUFunction@64@PEAX@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?Invoke@Object@Framework@DotNetLibrary@RC@@SAXPEAVUObject@Unreal@4@PEAVUFunction@64@PEAX@Z")]
 	internal static extern bool Invoke(IntPtr @object, IntPtr function, IntPtr @params);
-	[DllImport("UE4SSL.dll", EntryPoint = "?Find@Object@Framework@DotNetLibrary@RC@@SAPEAVUObject@Unreal@4@PEBD@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?Find@Object@Framework@DotNetLibrary@RC@@SAPEAVUObject@Unreal@4@PEBD@Z")]
 	internal static extern IntPtr Find(byte[] name);
-	[DllImport("UE4SSL.dll", EntryPoint = "?FindFirstOf@Object@Framework@DotNetLibrary@RC@@SAPEAVUObject@Unreal@4@PEBD@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?FindFirstOf@Object@Framework@DotNetLibrary@RC@@SAPEAVUObject@Unreal@4@PEBD@Z")]
 	internal static extern IntPtr FindFirstOf(byte[] name);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetName@Object@Framework@DotNetLibrary@RC@@SAXPEAVUObject@Unreal@4@PEAD@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetName@Object@Framework@DotNetLibrary@RC@@SAXPEAVUObject@Unreal@4@PEAD@Z")]
 	internal static extern void GetName(IntPtr @object, byte[] name);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetFullName@Object@Framework@DotNetLibrary@RC@@SAXPEAVUObject@Unreal@4@PEAD@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetFullName@Object@Framework@DotNetLibrary@RC@@SAXPEAVUObject@Unreal@4@PEAD@Z")]
 	internal static extern void GetFullName(IntPtr @object, byte[] name);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetClass@Object@Framework@DotNetLibrary@RC@@SAXPEAVUObject@Unreal@4@PEAPEAVUClass@64@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetClass@Object@Framework@DotNetLibrary@RC@@SAXPEAVUObject@Unreal@4@PEAPEAVUClass@64@@Z")]
 	internal static extern void GetClass(IntPtr @object, ref IntPtr @class);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetOuter@Object@Framework@DotNetLibrary@RC@@SAXPEAVUObject@Unreal@4@PEAPEAV564@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetOuter@Object@Framework@DotNetLibrary@RC@@SAXPEAVUObject@Unreal@4@PEAPEAV564@@Z")]
 	internal static extern void GetOuter(IntPtr @object, ref IntPtr outer);
-	[DllImport("UE4SSL.dll", EntryPoint = "?IsAnyClass@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?IsAnyClass@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@@Z")]
 	internal static extern void IsAnyClass(IntPtr @object);
-	[DllImport("UE4SSL.dll", EntryPoint = "?IsAnyClass@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?IsAnyClass@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@@Z")]
 	internal static extern void GetWorld(IntPtr @object, ref IntPtr world);
-	[DllImport("UE4SSL.dll", EntryPoint = "?IsA@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEAVUClass@64@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?IsA@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEAVUClass@64@@Z")]
 	internal static extern void IsA(IntPtr @object, IntPtr @class);
-	[DllImport("UE4SSL.dll", EntryPoint = "?HasAllFlags@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@W4EObjectFlags@64@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?HasAllFlags@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@W4EObjectFlags@64@@Z")]
 	internal static extern void HasAllFlags(IntPtr @object, int flags);
-	[DllImport("UE4SSL.dll", EntryPoint = "?HasAnyFlags@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@W4EObjectFlags@64@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?HasAnyFlags@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@W4EObjectFlags@64@@Z")]
 	internal static extern void HasAnyFlags(IntPtr @object, int flags);
-	[DllImport("UE4SSL.dll", EntryPoint = "?HasAnyInternalFlags@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@W4EInternalObjectFlags@64@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?HasAnyInternalFlags@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@W4EInternalObjectFlags@64@@Z")]
 	internal static extern void HasAnyInternalFlags(IntPtr @object, int flags);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetObjectReference@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAPEAV564@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetObjectReference@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAPEAV564@@Z")]
 	internal static extern bool GetObjectReference(IntPtr @object, byte[] name, ref IntPtr value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetFunction@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAPEAVUFunction@64@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetFunction@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAPEAVUFunction@64@@Z")]
 	internal static extern bool GetFunction(IntPtr @object, byte[] name, ref IntPtr value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetBool@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEA_N@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetBool@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEA_N@Z")]
 	internal static extern bool GetBool(IntPtr @object, byte[] name, ref bool value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetByte@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAE@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetByte@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAE@Z")]
 	internal static extern bool GetByte(IntPtr @object, byte[] name, ref byte value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetShort@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAF@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetShort@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAF@Z")]
 	internal static extern bool GetShort(IntPtr @object, byte[] name, ref short value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetInt@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAH@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetInt@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAH@Z")]
 	internal static extern bool GetInt(IntPtr @object, byte[] name, ref int value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetLong@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEA_J@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetLong@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEA_J@Z")]
 	internal static extern bool GetLong(IntPtr @object, byte[] name, ref long value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetUShort@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAG@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetUShort@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAG@Z")]
 	internal static extern bool GetUShort(IntPtr @object, byte[] name, ref ushort value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetUInt@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAI@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetUInt@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAI@Z")]
 	internal static extern bool GetUInt(IntPtr @object, byte[] name, ref uint value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetULong@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEA_K@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetULong@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEA_K@Z")]
 	internal static extern bool GetULong(IntPtr @object, byte[] name, ref ulong value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetStruct@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAPEAVUStruct@64@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetStruct@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAPEAVUStruct@64@@Z")]
 	internal static extern bool GetStruct(IntPtr @object, byte[] name, ref IntPtr value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetArray@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAUArray@234@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetArray@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAUUnArray@234@@Z")]
 	internal static extern bool GetArray(IntPtr @object, byte[] name, ref UnArray value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetFloat@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAM@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetFloat@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAM@Z")]
 	internal static extern bool GetFloat(IntPtr @object, byte[] name, ref float value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetDouble@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAN@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetDouble@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAN@Z")]
 	internal static extern bool GetDouble(IntPtr @object, byte[] name, ref double value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetEnum@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAH@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetEnum@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAH@Z")]
 	internal static extern bool GetEnum(IntPtr @object, byte[] name, ref long value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetWeakObject@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAUFWeakObjectPtr@64@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetWeakObject@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAUFWeakObjectPtr@64@@Z")]
 	internal static extern bool GetWeakObject(IntPtr @object, byte[] name, ref WeakObjectPtr value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetString@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAD@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetString@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAD@Z")]
 	internal static extern bool GetString(IntPtr @object, byte[] name, byte[] value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetText@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAD@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetText@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAD@Z")]
 	internal static extern bool GetText(IntPtr @object, byte[] name, byte[] value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?SetObjectReference@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBD0@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?SetObjectReference@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBD0@Z")]
 	internal static extern bool SetObjectReference(IntPtr @object, byte[] name, IntPtr value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?SetByte@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDE@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?SetByte@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDE@Z")]
 	internal static extern bool SetBool(IntPtr @object, byte[] name, bool value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?SetByte@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDE@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?SetByte@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDE@Z")]
 	internal static extern bool SetByte(IntPtr @object, byte[] name, byte value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?SetShort@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDF@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?SetShort@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDF@Z")]
 	internal static extern bool SetShort(IntPtr @object, byte[] name, short value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?SetInt@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDH@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?SetInt@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDH@Z")]
 	internal static extern bool SetInt(IntPtr @object, byte[] name, int value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?SetLong@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBD_J@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?SetLong@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBD_J@Z")]
 	internal static extern bool SetLong(IntPtr @object, byte[] name, long value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?SetUShort@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDG@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?SetUShort@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDG@Z")]
 	internal static extern bool SetUShort(IntPtr @object, byte[] name, ushort value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?SetUInt@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDI@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?SetUInt@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDI@Z")]
 	internal static extern bool SetUInt(IntPtr @object, byte[] name, uint value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?SetULong@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBD_K@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?SetULong@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBD_K@Z")]
 	internal static extern bool SetULong(IntPtr @object, byte[] name, ulong value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?SetStruct@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAVUStruct@64@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?SetStruct@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDPEAVUStruct@64@@Z")]
 	internal static extern bool SetStruct(IntPtr @object, byte[] name, IntPtr value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?SetArray@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDUUnArray@234@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?SetArray@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDUUnArray@234@@Z")]
 	internal static extern bool SetArray(IntPtr @object, byte[] name, UnArray value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?SetFloat@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDM@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?SetFloat@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDM@Z")]
 	internal static extern bool SetFloat(IntPtr @object, byte[] name, float value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?SetDouble@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDN@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?SetDouble@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDN@Z")]
 	internal static extern bool SetDouble(IntPtr @object, byte[] name, double value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?SetEnum@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDH@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?SetEnum@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBDH@Z")]
 	internal static extern bool SetEnum(IntPtr @object, byte[] name, int value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?SetString@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBD1@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?SetString@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBD1@Z")]
 	internal static extern bool SetString(IntPtr @object, byte[] name, byte[] value);
-	[DllImport("UE4SSL.dll", EntryPoint = "?SetText@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBD1@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?SetText@Object@Framework@DotNetLibrary@RC@@SA_NPEAVUObject@Unreal@4@PEBD1@Z")]
 	internal static extern bool SetText(IntPtr @object, byte[] name, byte[] value);
 }
 
 internal static unsafe class Struct
 {
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetSuperStruct@Struct@Framework@DotNetLibrary@RC@@CAPEAVUClass@Unreal@4@PEAVUStruct@64@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetSuperStruct@Struct@Framework@DotNetLibrary@RC@@CAPEAVUClass@Unreal@4@PEAVUStruct@64@@Z")]
 	internal static extern IntPtr GetSuperStruct(IntPtr @struct);
-	[DllImport("UE4SSL.dll", EntryPoint = "?ForEachFunction@Struct@Framework@DotNetLibrary@RC@@CAXPEAVUStruct@Unreal@4@P6AXPEAVUFunction@64@@Z@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?ForEachFunction@Struct@Framework@DotNetLibrary@RC@@CAXPEAVUStruct@Unreal@4@P6AXPEAVUFunction@64@@Z@Z")]
 	internal static extern bool ForEachFunction(IntPtr @struct, delegate* unmanaged[Cdecl]<IntPtr, void> callback);
-	[DllImport("UE4SSL.dll", EntryPoint = "?ForEachProperty@Struct@Framework@DotNetLibrary@RC@@CAXPEAVUStruct@Unreal@4@P6AXPEAVFProperty@64@@Z@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?ForEachProperty@Struct@Framework@DotNetLibrary@RC@@CAXPEAVUStruct@Unreal@4@P6AXPEAVFProperty@64@@Z@Z")]
 	internal static extern bool ForEachProperty(IntPtr @struct, delegate* unmanaged[Cdecl]<IntPtr, void> callback);
 }
 
 internal static class Class
 {
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetCDO@Class@Framework@DotNetLibrary@RC@@CAXPEAVUClass@Unreal@4@PEAPEAVUObject@64@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetCDO@Class@Framework@DotNetLibrary@RC@@CAXPEAVUClass@Unreal@4@PEAPEAVUObject@64@@Z")]
 	internal static extern void GetCDO(IntPtr @class, ref IntPtr cdo);
-	[DllImport("UE4SSL.dll", EntryPoint = "?IsChildOf@Class@Framework@DotNetLibrary@RC@@CA_NPEAVUClass@Unreal@4@0@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?IsChildOf@Class@Framework@DotNetLibrary@RC@@CA_NPEAVUClass@Unreal@4@0@Z")]
 	internal static extern bool IsChildOf(IntPtr @class, IntPtr parent);
 }
 
 internal static class Function
 {
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetParmsSize@Function@Framework@DotNetLibrary@RC@@CAHPEAVUFunction@Unreal@4@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetParmsSize@Function@Framework@DotNetLibrary@RC@@CAHPEAVUFunction@Unreal@4@@Z")]
 	internal static extern int GetParmsSize(IntPtr func);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetOffsetOfParam@Function@Framework@DotNetLibrary@RC@@CAHPEAVUFunction@Unreal@4@PEBD@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetOffsetOfParam@Function@Framework@DotNetLibrary@RC@@CAHPEAVUFunction@Unreal@4@PEBD@Z")]
 	internal static extern int GetOffsetOfParam(IntPtr func, byte[] name);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetSizeOfParam@Function@Framework@DotNetLibrary@RC@@CAHPEAVUFunction@Unreal@4@PEBD@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetSizeOfParam@Function@Framework@DotNetLibrary@RC@@CAHPEAVUFunction@Unreal@4@PEBD@Z")]
 	internal static extern int GetSizeOfParam(IntPtr func, byte[] name);
-	[DllImport("UE4SSL.dll", EntryPoint = "?GetReturnValueOffset@Function@Framework@DotNetLibrary@RC@@CAHPEAVUFunction@Unreal@4@@Z")]
+	[DllImport("CSharpLoader.dll", EntryPoint = "?GetReturnValueOffset@Function@Framework@DotNetLibrary@RC@@CAHPEAVUFunction@Unreal@4@@Z")]
 	internal static extern int GetReturnValueOffset(IntPtr func);
 }
