@@ -28,7 +28,7 @@ using UE4SSDotNetRuntime.Plugins;
  *  SOFTWARE.
  */
 
-namespace UE4SSDotNetRuntime.Runtime;
+namespace UE4SSL.Runtime;
 
 internal enum LogLevel
 {

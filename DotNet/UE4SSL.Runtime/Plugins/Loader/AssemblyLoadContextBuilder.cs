@@ -1,8 +1,8 @@
 ﻿using System.Reflection;
 using System.Runtime.Loader;
-using UE4SSDotNetRuntime.Plugins.LibraryModel;
+using UE4SSL.Plugins.LibraryModel;
 
-namespace UE4SSDotNetRuntime.Plugins.Loader;
+namespace UE4SSL.Plugins.Loader;
 
 public class AssemblyLoadContextBuilder
 {

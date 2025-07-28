@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace UE4SSDotNetRuntime.Plugins;
+namespace UE4SSL.Plugins;
 
 internal class PlatformInformation
 {

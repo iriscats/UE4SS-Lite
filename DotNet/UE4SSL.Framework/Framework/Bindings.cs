@@ -3,7 +3,7 @@ using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace UE4SSDotNetFramework.Framework;
+namespace UE4SSL.Framework;
 
 internal static class Shared
 {

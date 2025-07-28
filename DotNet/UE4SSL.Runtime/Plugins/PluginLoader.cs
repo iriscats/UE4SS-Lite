@@ -1,9 +1,9 @@
 ﻿using System.Reflection;
 using System.Runtime.Loader;
-using UE4SSDotNetRuntime.Plugins.Internal;
-using UE4SSDotNetRuntime.Plugins.Loader;
+using UE4SSL.Plugins.Internal;
+using UE4SSL.Plugins.Loader;
 
-namespace UE4SSDotNetRuntime.Plugins;
+namespace UE4SSL.Plugins;
 
 public class PluginLoader
 {

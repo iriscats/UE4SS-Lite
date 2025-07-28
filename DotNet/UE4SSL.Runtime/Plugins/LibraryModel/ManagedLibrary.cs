@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Reflection;
 
-namespace UE4SSDotNetRuntime.Plugins.LibraryModel;
+namespace UE4SSL.Plugins.LibraryModel;
 
 [DebuggerDisplay("{Name} = {AdditionalProbingPath}")]
 public class ManagedLibrary

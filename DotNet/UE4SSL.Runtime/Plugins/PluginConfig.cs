@@ -1,7 +1,7 @@
 ﻿using System.Reflection;
 using System.Runtime.Loader;
 
-namespace UE4SSDotNetRuntime.Plugins;
+namespace UE4SSL.Plugins;
 
 public class PluginConfig
 {

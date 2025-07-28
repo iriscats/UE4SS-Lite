@@ -1,9 +1,9 @@
 ﻿using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
-using UE4SSDotNetRuntime.Plugins.LibraryModel;
+using UE4SSL.Plugins.LibraryModel;
 
-namespace UE4SSDotNetRuntime.Plugins.Loader;
+namespace UE4SSL.Plugins.Loader;
 
 [DebuggerDisplay("{Name} = {AdditionalProbingPath}")]
 public class ManagedLoadContext : AssemblyLoadContext
@@ -39,7 +39,19 @@ public class ManagedLoadContext : AssemblyLoadContext
     private readonly string _unmanagedDllShadowCopyDirectoryPath;
     
 
-	public ManagedLoadContext(string mainAssemblyPath, IReadOnlyDictionary<string, ManagedLibrary> managedAssemblies, IReadOnlyDictionary<string, NativeLibrary> nativeLibraries, IReadOnlyCollection<string> privateAssemblies, IReadOnlyCollection<string> defaultAssemblies, IReadOnlyCollection<string> additionalProbingPaths, IReadOnlyCollection<string> resourceProbingPaths, AssemblyLoadContext defaultLoadContext, bool preferDefaultLoadContext, bool lazyLoadReferences, bool isCollectible, bool loadInMemory, bool shadowCopyNativeLibraries)
+	public ManagedLoadContext(string mainAssemblyPath, 
+								IReadOnlyDictionary<string, ManagedLibrary> managedAssemblies, 
+								IReadOnlyDictionary<string, NativeLibrary> nativeLibraries, 
+								IReadOnlyCollection<string> privateAssemblies,
+								IReadOnlyCollection<string> defaultAssemblies, 
+								IReadOnlyCollection<string> additionalProbingPaths,
+								IReadOnlyCollection<string> resourceProbingPaths, 
+								AssemblyLoadContext defaultLoadContext, 
+								bool preferDefaultLoadContext,
+								bool lazyLoadReferences,
+								bool isCollectible, 
+								bool loadInMemory,
+								bool shadowCopyNativeLibraries)
 		: base(Path.GetFileNameWithoutExtension(mainAssemblyPath), isCollectible)
 	{
 		if (resourceProbingPaths == null)
@@ -80,7 +92,8 @@ public class ManagedLoadContext : AssemblyLoadContext
 		{
 			return null;
 		}
-		if ((_preferDefaultLoadContext || _defaultAssemblies.Contains(assemblyName.Name)) && !_privateAssemblies.Contains<string>(assemblyName.Name))
+		if ((_preferDefaultLoadContext || _defaultAssemblies.Contains(assemblyName.Name)) 
+			&& !_privateAssemblies.Contains<string>(assemblyName.Name))
 		{
 			try
 			{

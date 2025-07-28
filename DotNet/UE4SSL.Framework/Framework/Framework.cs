@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace UE4SSDotNetFramework.Framework 
+namespace UE4SSL.Framework 
 {
 	internal static class ArrayPool {
 		[ThreadStatic]

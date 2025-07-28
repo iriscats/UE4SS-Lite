@@ -1,4 +1,4 @@
-﻿namespace UE4SSDotNetRuntime.Plugins;
+﻿namespace UE4SSL.Plugins;
 
 public class PluginReloadedEventArgs(PluginLoader loader) : EventArgs
 {

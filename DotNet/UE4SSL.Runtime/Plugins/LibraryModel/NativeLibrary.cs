@@ -1,4 +1,4 @@
-﻿namespace UE4SSDotNetRuntime.Plugins.LibraryModel;
+﻿namespace UE4SSL.Plugins.LibraryModel;
 
 public class NativeLibrary
 {

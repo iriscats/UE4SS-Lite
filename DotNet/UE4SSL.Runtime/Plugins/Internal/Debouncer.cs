@@ -1,4 +1,4 @@
-﻿namespace UE4SSDotNetRuntime.Plugins.Internal;
+﻿namespace UE4SSL.Plugins.Internal;
 
 public class Debouncer : IDisposable
 {
