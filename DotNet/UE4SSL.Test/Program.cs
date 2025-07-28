@@ -1,4 +1,6 @@
-﻿namespace UE4SSL.Test
+﻿using UE4SSL.Framework;
+
+namespace UE4SSL.Test
 {
     public static class Main
     {

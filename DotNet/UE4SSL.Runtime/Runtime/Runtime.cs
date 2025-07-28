@@ -3,7 +3,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
-using UE4SSDotNetRuntime.Plugins;
+using UE4SSL.Plugins;
 
 /*
  *  Unreal Engine .NET 6 integration
@@ -235,13 +235,12 @@ public static unsafe class Core
         {
             userEvents = new List<IntPtr>();
             plugins = new List<Plugin>();
-            const string frameworkAssemblyName = "UE4SSDotNetFramework";
+            const string frameworkAssemblyName = "UE4SSL.Framework";
+
             string assemblyPath = Assembly.GetExecutingAssembly().Location;
             string managedFolder = assemblyPath.Substring(0, assemblyPath.IndexOf("DotNetRuntime", StringComparison.Ordinal)) + "DotNetPlugins";
             string[] folders = Directory.GetDirectories(managedFolder);
-
             Array.Resize(ref folders, folders.Length + 1);
-
             folders[^1] = managedFolder;
 
             foreach (string folder in folders)
@@ -348,7 +347,6 @@ public static unsafe class Core
         {
             ((delegate* unmanaged[Cdecl]<void>)function)();
         }
-
         catch (Exception exception)
         {
             try
@@ -398,7 +396,6 @@ public static unsafe class Core
             assembliesContextManager = new();
             assembliesContextWeakReference = assembliesContextManager.CreateAssembliesContext();
         }
-
         catch (Exception exception)
         {
             Log(LogLevel.Error, "Unloading of assemblies failed\r\n" + exception);

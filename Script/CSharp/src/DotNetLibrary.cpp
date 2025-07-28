@@ -15,7 +15,7 @@
 namespace RC::DotNetLibrary
 {
 
-	const auto runtime_type_name = L"UE4SSDotNetRuntime.Runtime.Core, UE4SSDotNetRuntime";
+	const auto runtime_type_name = L"UE4SSL.Runtime.Core, UE4SSDotNetRuntime";
 
 	auto Runtime::log(LogLevel::LogLevel Level, const char* Message)
 	{

@@ -50,6 +50,7 @@ on_install(function(target) end)
 
 includes("deps")
 includes("UE4SSL")
+includes("Script")
 
 -- TODO: Remove this before the next release. It only exists to maintain backwards compat
 -- warnings for older mod templates.

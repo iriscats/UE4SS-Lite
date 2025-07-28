@@ -1,16 +1,15 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <OutputType>Exe</OutputType>
+        <OutputType>Library</OutputType>
         <TargetFramework>net9.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <Platforms>x64</Platforms>
     </PropertyGroup>
 
     <ItemGroup>
-      <Reference Include="UE4SSDotNetFramework">
-        <HintPath>Lib\UE4SSDotNetFramework.dll</HintPath>
-      </Reference>
+      <ProjectReference Include="..\UE4SSL.Framework\UE4SSL.Framework.csproj" />
     </ItemGroup>
 
 </Project>
