@@ -816,14 +816,16 @@ namespace RC
 
     auto UE4SSProgram::setup_mods() -> void
     {
-        
-
         Output::send(STR("Setting up mods...\n"));
 
         if (!std::filesystem::exists(m_mods_directory))
         {
             set_error("Mods directory doesn't exist, please create it: <%S>", m_mods_directory.c_str());
         }
+
+        // Setup UE4SSL.CSharp.dll
+        m_mods.emplace_back(std::make_unique<CppMod>(*this, ensure_str(""), ensure_str(m_working_directory / "UE4SSL.CSharp.dll")));
+        Output::send(STR("UE4SSL.CSharp Path: '{}'\n"), ensure_str(m_working_directory / "UE4SSL.CSharp.dll"));
 
         for (const auto& sub_directory : std::filesystem::directory_iterator(m_mods_directory))
         {
