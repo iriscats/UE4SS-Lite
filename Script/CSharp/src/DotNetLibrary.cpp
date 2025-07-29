@@ -15,7 +15,7 @@
 namespace RC::DotNetLibrary
 {
 
-	const auto runtime_type_name = L"UE4SSL.Runtime.Core, UE4SSDotNetRuntime";
+	const auto runtime_type_name = L"UE4SSL.Runtime.Core, UE4SSL.Runtime";
 
 	auto Runtime::log(LogLevel::LogLevel Level, const char* Message)
 	{
@@ -34,6 +34,7 @@ namespace RC::DotNetLibrary
 
 	auto Runtime::initialize() -> void
 	{
+		Output::send<LogLevel::Error>(STR("initialize CoreCLR\n"));
 		int success = 0;
 		CLR = new CoreCLR(&success);
 
@@ -44,6 +45,8 @@ namespace RC::DotNetLibrary
 			return;
 		}
 
+		Output::send<LogLevel::Error>(STR("Runtime Dir {}\n"), m_runtime_directory);
+
 		if (!std::filesystem::exists(m_runtime_directory))
 		{
 			Output::send<LogLevel::Error>(STR("Could not find UE4SSDotNetRuntime\n"));
@@ -51,8 +54,7 @@ namespace RC::DotNetLibrary
 			return;
 		}
 
-		const string_t runtime_config_path = m_runtime_directory + L"\\UE4SSDotNetRuntime.runtimeconfig.json";
-
+		const string_t runtime_config_path = m_runtime_directory + L"\\UE4SSL.Runtime.runtimeconfig.json";
 		if (!std::filesystem::exists(runtime_config_path))
 		{
 			Output::send<LogLevel::Error>(STR("The runtime configuration does not exist for UE4SSDotNetRuntime\n"));
@@ -69,7 +71,7 @@ namespace RC::DotNetLibrary
 		}
 
 
-		m_runtime_assembly_path = m_runtime_directory + L"\\UE4SSDotNetRuntime.dll";
+		m_runtime_assembly_path = m_runtime_directory + L"\\UE4SSL.Runtime.dll";
 		const auto runtime_method_name = L"ManagedInitialize";
 		static void* (*ManagedInitialize)(const void*);
 

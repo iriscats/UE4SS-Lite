@@ -3,7 +3,7 @@
 #include <windows.h>
 #include <libloaderapi.h>
 
-#pragma(lib, "advapi32.lib")
+#pragma comment(lib, "advapi32.lib")
 
 CoreCLR::CoreCLR(int* success)
 {

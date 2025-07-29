@@ -10,11 +10,10 @@
 
 namespace RC
 {
-    CppMod::CppMod(UE4SSProgram& program, StringType&& mod_name, StringType&& mod_path) : Mod(program, std::move(mod_name), std::move(mod_path))
+    CppMod::CppMod(UE4SSProgram& program, StringType&& mod_name, StringType&& mod_path)
+        : Mod(program, std::move(mod_name), std::move(mod_path))
     {
-        // m_dlls_path = m_mod_path / STR("dlls");
         m_dlls_path = m_mod_path;
-        //Output::send<LogLevel::Warning>(STR("m_dlls_path {}\n"), m_dlls_path.c_str());
 
         if (!std::filesystem::exists(m_dlls_path))
         {
@@ -23,8 +22,47 @@ namespace RC
             return;
         }
 
-        auto dll_path = m_dlls_path / STR("main.dll");
-       //Output::send<LogLevel::Warning>(STR("dll_path {}\n"), dll_path.c_str());
+       auto dll_path = m_dlls_path / STR("main.dll");
+
+        // Add mods dlls directory to search path for dynamic/shared linked libraries in mods
+        m_dlls_path_cookie = AddDllDirectory(m_dlls_path.c_str());
+        m_main_dll_module = LoadLibraryExW(dll_path.c_str(), NULL, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+
+        if (!m_main_dll_module)
+        {
+            Output::send<LogLevel::Warning>(STR("Failed to load dll <{}> for mod {}, error code: 0x{:x}\n"), ensure_str(dll_path), m_mod_name, GetLastError());
+            set_installable(false);
+            return;
+        }
+
+        m_start_mod_func = reinterpret_cast<start_type>(GetProcAddress(m_main_dll_module, "start_mod"));
+        m_uninstall_mod_func = reinterpret_cast<uninstall_type>(GetProcAddress(m_main_dll_module, "uninstall_mod"));
+
+        if (!m_start_mod_func || !m_uninstall_mod_func)
+        {
+            Output::send<LogLevel::Warning>(STR("Failed to find exported mod lifecycle functions for mod {}\n"), m_mod_name);
+
+            FreeLibrary(m_main_dll_module);
+            m_main_dll_module = NULL;
+
+            set_installable(false);
+            return;
+        }
+    }
+
+    CppMod::CppMod(UE4SSProgram& program, StringType&& mod_name, StringType&& mod_path, StringType&& dll_name) 
+        : Mod(program, std::move(mod_name), std::move(mod_path))
+    {
+        m_dlls_path = m_mod_path;
+
+        if (!std::filesystem::exists(m_dlls_path))
+        {
+            Output::send<LogLevel::Warning>(STR("Could not find the dlls folder for mod {}\n"), m_mod_name);
+            set_installable(false);
+            return;
+        }
+
+        auto dll_path = m_dlls_path / dll_name;
 
         // Add mods dlls directory to search path for dynamic/shared linked libraries in mods
         m_dlls_path_cookie = AddDllDirectory(m_dlls_path.c_str());

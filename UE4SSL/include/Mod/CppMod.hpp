@@ -29,6 +29,7 @@ namespace RC
 
       public:
         CppMod(UE4SSProgram&, StringType&& mod_name, StringType&& mod_path);
+        CppMod(UE4SSProgram&, StringType&& mod_name, StringType&& mod_path, StringType&& dll_name);
         CppMod(CppMod&) = delete;
         CppMod(CppMod&&) = delete;
         ~CppMod() override;

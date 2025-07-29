@@ -3,7 +3,7 @@ includes("proxy_generator")
 --add_requires("imgui v1.89", { debug = is_mode_debug(), configs = { win32 = true, dx11 = true, opengl3 = true, glfw_opengl3 = true , runtimes = get_mode_runtimes()} } )
 --add_requires("ImGuiTextEdit v1.0", { debug = is_mode_debug(), configs = {runtimes = get_mode_runtimes()} })
 --add_requires("IconFontCppHeaders v1.0", { debug = is_mode_debug(), configs = {runtimes = get_mode_runtimes()}})
-add_requires("glfw 3.3.9", { debug = is_mode_debug() , configs = {runtimes = get_mode_runtimes()}})
+--add_requires("glfw 3.3.9", { debug = is_mode_debug() , configs = {runtimes = get_mode_runtimes()}})
 --add_requires("opengl", { debug = is_mode_debug(), configs = {runtimes = get_mode_runtimes()} })
 --add_requires("glaze v2.9.5", { debug = is_mode_debug(), configs = {runtimes = get_mode_runtimes()} })
 add_requires("fmt 10.2.1", { debug = is_mode_debug(), configs = {runtimes = get_mode_runtimes()} })
@@ -67,7 +67,9 @@ target(projectName)
     add_deps(
         "File", "DynamicOutput", "Unreal",
         "SinglePassSigScanner", "Function",
-        "IniParser", "JSON", "Input",
+        "IniParser", 
+        --"JSON", 
+        "Input",
         "Constructs", "Helpers", "MProgram",
         -- "ScopedTimer", "Profiler", 
         "patternsleuth_bind",

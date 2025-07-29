@@ -45,8 +45,15 @@
 
 #include <polyhook2/PE/IatHook.hpp>
 
+#pragma comment(lib, "User32.lib")
+
 namespace RC
 {
+
+    template<typename Derived, typename Base>
+    std::unique_ptr<Base> upcast_unique(std::unique_ptr<Derived>&& derived) {
+        return std::unique_ptr<Base>(std::move(derived));
+    }
 
     SettingsManager UE4SSProgram::settings_manager{};
 
@@ -824,8 +831,7 @@ namespace RC
         }
 
         // Setup UE4SSL.CSharp.dll
-        m_mods.emplace_back(std::make_unique<CppMod>(*this, ensure_str(""), ensure_str(m_working_directory / "UE4SSL.CSharp.dll")));
-        Output::send(STR("UE4SSL.CSharp Path: '{}'\n"), ensure_str(m_working_directory / "UE4SSL.CSharp.dll"));
+        m_mods.emplace_back(std::make_unique<CppMod>(*this, STR("UE4SSL.CSharp"), ensure_str(m_working_directory), STR("UE4SSL.CSharp.dll")));
 
         for (const auto& sub_directory : std::filesystem::directory_iterator(m_mods_directory))
         {
@@ -891,6 +897,7 @@ namespace RC
                 continue;
             }
 
+            Output::send(STR("Install mod '{}'.\n"), mod->get_name());
             mod->set_installed(true);
         }
     }
@@ -953,71 +960,29 @@ namespace RC
     template <typename ModType>
     auto start_mods() -> std::string
     {
-        
-        // Part #1: Start all mods that are enabled in mods.txt.
-        Output::send(STR("Starting mods (from mods.txt load order)...\n"));
-
         std::filesystem::path mods_directory = UE4SSProgram::get_program().get_mods_directory();
-        std::wstring enabled_mods_file{mods_directory / "mods.txt"};
-        if (!std::filesystem::exists(enabled_mods_file))
+    
+        auto cs_mod = UE4SSProgram::find_mod_by_name<ModType>(STR("UE4SSL.CSharp"), UE4SSProgram::IsInstalled::Yes);
+        if (!dynamic_cast<ModType*>(cs_mod))
         {
-            Output::send(STR("No mods.txt file found...\n"));
-        }
-        else
-        {
-            // 'mods.txt' exists, lets parse it
-            StreamIType mods_stream{enabled_mods_file};
-
-            StringType current_line;
-            while (std::getline(mods_stream, current_line))
-            {
-                // Don't parse any lines with ';'
-                if (current_line.find(STR(";")) != current_line.npos)
-                {
-                    continue;
-                }
-
-                // Don't parse if the line is impossibly short (empty lines for example)
-                if (current_line.size() <= 4)
-                {
-                    continue;
-                }
-
-                // Remove all spaces
-                auto end = std::remove(current_line.begin(), current_line.end(), STR(' '));
-                current_line.erase(end, current_line.end());
-
-                // Parse the line into something that can be converted into proper data
-                StringType mod_name = explode_by_occurrence(current_line, STR(':'), 1);
-                StringType mod_enabled = explode_by_occurrence(current_line, STR(':'), ExplodeType::FromEnd);
-
-                auto mod = UE4SSProgram::find_mod_by_name<ModType>(mod_name, UE4SSProgram::IsInstalled::Yes);
-                if (!mod || !dynamic_cast<ModType*>(mod))
-                {
-                    continue;
-                }
-
-                if (!mod_enabled.empty() && mod_enabled[0] == STR('1'))
-                {
-                    Output::send(STR("Starting {} mod '{}'\n"), STR("C++"), mod->get_name().data());
-                    mod->start_mod();
-                }
-                else
-                {
-                    Output::send(STR("Mod '{}' disabled in mods.txt.\n"), mod_name);
-                }
-            }
+            Output::send(STR("Mod dynamic_cast error: {} \n"), STR("UE4SSL.CSharp"));
         }
 
-        // Part #2: Start all mods that have enabled.txt present in the mod directory.
-        Output::send(STR("Starting mods (from enabled.txt, no defined load order)...\n"));
+        if (!cs_mod->is_started())
+        {
+            cs_mod->start_mod();
+            Output::send(STR("Load Mod '{}' , starting mod.\n"), cs_mod->get_name().data());
+        }
+
 
         for (const auto& mod_directory : std::filesystem::directory_iterator(mods_directory))
         {
+           
             std::error_code ec{};
 
             if (!mod_directory.is_directory(ec))
             {
+                Output::send(STR("is_directory false\n"));
                 continue;
             }
             if (ec.value() != 0)
@@ -1038,6 +1003,7 @@ namespace RC
             auto mod = UE4SSProgram::find_mod_by_name<ModType>(ensure_str(mod_directory.path().stem()), UE4SSProgram::IsInstalled::Yes);
             if (!dynamic_cast<ModType*>(mod))
             {
+                Output::send(STR("Mod dynamic_cast error: {} \n"), ensure_str(mod_directory.path().stem()));
                 continue;
             }
             if (!mod)

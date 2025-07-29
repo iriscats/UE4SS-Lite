@@ -26,9 +26,11 @@ public:
             Output::send<LogLevel::Error>(STR("GetModuleFileName failed, error = {}\n"), GetLastError());
             return;
         }
+        
+        Output::send<LogLevel::Error>(STR("initialize CSharpLoaderProxy\n"));
 
         std::filesystem::path runtime_path(path);
-        m_runtime = new DotNetLibrary::Runtime(runtime_path.parent_path());
+        m_runtime = new DotNetLibrary::Runtime(runtime_path.parent_path() / "ue4ss");
         m_runtime->initialize();
     }
 
@@ -59,6 +61,7 @@ extern "C"
 {
     CSHARPLOADERPROXY_API CppUserModBase* start_mod()
     {
+        Output::send<LogLevel::Error>(STR("CSharpLoaderProxy start_mod\n"));
         return new CSharpLoaderProxy();
     }
 
