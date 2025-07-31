@@ -238,11 +238,15 @@ public static unsafe class Core
             const string frameworkAssemblyName = "UE4SSL.Framework";
 
             string assemblyPath = Assembly.GetExecutingAssembly().Location;
-            string managedFolder = assemblyPath.Substring(0, assemblyPath.IndexOf("DotNetRuntime", StringComparison.Ordinal)) + "DotNetPlugins";
-            string[] folders = Directory.GetDirectories(managedFolder);
-            Array.Resize(ref folders, folders.Length + 1);
-            folders[^1] = managedFolder;
-
+            string baseDirectory = Path.GetDirectoryName(assemblyPath)!;
+            string modsDirectory = Path.Combine(baseDirectory, "csmods");
+            if (!Directory.Exists(modsDirectory))
+            {
+                Log(LogLevel.Warning, $"Mods directory not found: {modsDirectory}");
+                return 0;
+            }
+            
+            string[] folders = Directory.GetDirectories(modsDirectory);
             foreach (string folder in folders)
             {
                 IEnumerable<string> assemblies = Directory.EnumerateFiles(folder, "*.dll", SearchOption.AllDirectories);
@@ -294,7 +298,7 @@ public static unsafe class Core
                             {
                                 Log(LogLevel.Default, "start loaded EnterContextualReflection");
 
-                                Type? sharedClass = framework.GetType(frameworkAssemblyName + ".Framework" + ".Shared");
+                                Type? sharedClass = framework.GetType(frameworkAssemblyName + ".Shared");
                                 if (sharedClass is null)
                                 {
                                     Log(LogLevel.Default, "framework.GetType is null");

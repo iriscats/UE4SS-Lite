@@ -765,7 +765,6 @@ namespace RC
 
     auto UE4SSProgram::update() -> void
     {
-        //ProfilerSetThreadName("UE4SS-UpdateThread");
         on_program_start();
 
         Output::send(STR("Event loop start\n"));
@@ -778,8 +777,6 @@ namespace RC
 
             if (!is_queue_empty())
             {
-                // ProfilerScope();Named("event processing");
-
                 static constexpr size_t max_events_executed_per_frame = 5;
                 size_t num_events_executed{};
                 std::lock_guard<std::mutex> guard(m_event_queue_mutex);
@@ -800,8 +797,7 @@ namespace RC
             m_input_handler.process_event();
 
             {
-                // ProfilerScope();Named("mod update processing");
-
+             
                 for (auto& mod : m_mods)
                 {
                     if (mod->is_started())
@@ -812,7 +808,6 @@ namespace RC
             }
 
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
-            //ProfilerFrameMark();
         }
         Output::send(STR("Event loop end\n"));
     }
