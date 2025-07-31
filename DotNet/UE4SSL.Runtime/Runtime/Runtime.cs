@@ -120,8 +120,8 @@ internal unsafe struct Command
 
 internal sealed class Plugin
 {
-    internal PluginLoader loader;
-    internal Assembly assembly;
+    internal PluginLoader loader = null;
+    internal Assembly assembly = null;
     internal List<Dictionary<int, IntPtr>?> userFunctions;
 }
 
@@ -153,6 +153,7 @@ public static unsafe class Core
 
     public static void StartMod()
     {
+        Console.WriteLine("Runtime.StartMod");
         foreach (var userEvent in userEvents.Where(userEvent => ((IntPtr*)userEvent)[0] is not 0))
         {
             ((delegate* unmanaged[Cdecl]<void>)((IntPtr*)userEvent)[0])();
@@ -161,6 +162,7 @@ public static unsafe class Core
 
     public static void StopMod()
     {
+        Console.WriteLine("Runtime.StopMod");
         foreach (var userEvent in userEvents.Where(userEvent => ((IntPtr*)userEvent)[1] is not 0))
         {
             ((delegate* unmanaged[Cdecl]<void>)((IntPtr*)userEvent)[1])();
@@ -169,6 +171,7 @@ public static unsafe class Core
 
     public static void ProgramStart()
     {
+        Console.WriteLine("Runtime.ProgramStart");
         foreach (var userEvent in userEvents.Where(userEvent => ((IntPtr*)userEvent)[2] is not 0))
         {
             ((delegate* unmanaged[Cdecl]<void>)((IntPtr*)userEvent)[2])();
@@ -177,6 +180,8 @@ public static unsafe class Core
 
     public static void UnrealInit()
     {
+        Console.WriteLine("Runtime.UnrealInit");
+
         foreach (var userEvent in userEvents.Where(userEvent => ((IntPtr*)userEvent)[3] is not 0))
         {
             ((delegate* unmanaged[Cdecl]<void>)((IntPtr*)userEvent)[3])();
@@ -190,7 +195,6 @@ public static unsafe class Core
             ((delegate* unmanaged[Cdecl]<void>)((IntPtr*)userEvent)[4])();
         }
     }
-
 
 
     [UnmanagedCallersOnly]
@@ -245,8 +249,8 @@ public static unsafe class Core
                 Log(LogLevel.Warning, $"Mods directory not found: {modsDirectory}");
                 return 0;
             }
-            
-            string[] folders = Directory.GetDirectories(modsDirectory);
+
+            string[] folders = new string[] { modsDirectory };
             foreach (string folder in folders)
             {
                 IEnumerable<string> assemblies = Directory.EnumerateFiles(folder, "*.dll", SearchOption.AllDirectories);

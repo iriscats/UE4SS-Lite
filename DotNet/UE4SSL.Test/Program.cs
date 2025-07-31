@@ -8,7 +8,7 @@ namespace UE4SSL.Test
 
         public unsafe static void OnInitCave(IntPtr @this, void*[] @params, void* retValue)
         {
-     
+
         }
 
 
@@ -29,10 +29,46 @@ namespace UE4SSL.Test
 
         }
 
-        public static void Update() 
+        public unsafe static void OnPost(IntPtr @this, void*[] @params, void* retValue)
         {
-            Debug.Log(LogLevel.Warning, "Update");
 
+        }
+
+        static bool isHook = false;
+
+        private static void Hook() {
+
+            unsafe
+            {
+                if (isHook)
+                {
+                    return;
+                }
+
+                isHook = true;
+                var initCave = ObjectReference.Find("/Game/ModIntegration/MI_SpawnMods.MI_SpawnMods_C:OnInitCave");
+                if (initCave is null)
+                {
+                    return;
+                }
+                Debug.Log(LogLevel.Warning, "initCave");
+                Hooking.HookUFunction(initCave, OnInitCave, OnPost);
+
+                var initRigSapce = ObjectReference.Find("/Game/ModIntegration/MI_SpawnMods.MI_SpawnMods_C:OnInitRigSpace");
+                if (initRigSapce is null)
+                {
+                    return;
+                }
+                Hooking.HookUFunction(initRigSapce, OnInitRigSpace, OnPost);
+            }
+
+        }
+
+
+        public static void Update()
+        {
+            //Debug.Log(LogLevel.Warning, "Update");
+            Hook();
         }
 
         public static void StartMod()
@@ -43,14 +79,6 @@ namespace UE4SSL.Test
         public static void UnrealInit()
         {
             Debug.Log(LogLevel.Warning, "UnrealInit");
-
-            unsafe {
-                var initCave = ObjectReference.Find("/Game/ModIntegration/MI_SpawnMods.MI_SpawnMods_C");
-                Hooking.HookUFunction(initCave, OnInitCave, null);
-
-                var initRigSapce = ObjectReference.Find("/Game/ModIntegration/MI_SpawnMods.MI_SpawnMods_C");
-                Hooking.HookUFunction(initRigSapce, OnInitRigSpace, null);
-            }
         }
 
 
@@ -58,6 +86,7 @@ namespace UE4SSL.Test
         {
             Debug.Log(LogLevel.Warning, "ProgramStart");
 
+     
         }
     }
 }
