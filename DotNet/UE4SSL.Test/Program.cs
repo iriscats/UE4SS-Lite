@@ -1,19 +1,29 @@
-﻿using UE4SSL.Framework;
+﻿using System.Runtime.InteropServices;
+using UE4SSL.Framework;
+using UE4SSL.Test.DRGSDK;
 
 namespace UE4SSL.Test
 {
 
-    public static class Main
-    {
+    class MyMod : DRGMod {
 
-        public unsafe static void OnInitCave(IntPtr @this, void*[] @params, void* retValue)
+        public MyMod()
         {
-
+            OnInitRigSpaceCallback += OnInitRigSpace;
+            OnInitCaveCallback += OnInitCave;
         }
 
 
-        public unsafe static void OnInitRigSpace(IntPtr @this, void*[] @params, void* retValue)
+        public void OnInitCave()
         {
+            Debug.Log(LogLevel.Warning, "OnInitCave");
+        }
+
+
+        public void OnInitRigSpace()
+        {
+            Debug.Log(LogLevel.Warning, "OnInitRigSpace");
+
             var gameFunctionLibrary = GameFunctionLibrary.GetInstance();
             var worldContext = Utils.GetWorldContext();
             var gameMode = gameFunctionLibrary?.GetFSDGameMode(worldContext!);
@@ -26,67 +36,23 @@ namespace UE4SSL.Test
                     Debug.Log(LogLevel.Error, item.ToString());
                 }
             }
-
         }
+    }
 
-        public unsafe static void OnPost(IntPtr @this, void*[] @params, void* retValue)
-        {
 
-        }
-
-        static bool isHook = false;
-
-        private static void Hook() {
-
-            unsafe
-            {
-                if (isHook)
-                {
-                    return;
-                }
-
-                isHook = true;
-                var initCave = ObjectReference.Find("/Game/ModIntegration/MI_SpawnMods.MI_SpawnMods_C:OnInitCave");
-                if (initCave is null)
-                {
-                    return;
-                }
-                Debug.Log(LogLevel.Warning, "initCave");
-                Hooking.HookUFunction(initCave, OnInitCave, OnPost);
-
-                var initRigSapce = ObjectReference.Find("/Game/ModIntegration/MI_SpawnMods.MI_SpawnMods_C:OnInitRigSpace");
-                if (initRigSapce is null)
-                {
-                    return;
-                }
-                Hooking.HookUFunction(initRigSapce, OnInitRigSpace, OnPost);
-            }
-
-        }
-
+    public static class Main
+    {
+        private static MyMod mod = new MyMod();
 
         public static void Update()
         {
-            //Debug.Log(LogLevel.Warning, "Update");
-            Hook();
+            mod.Update();
         }
 
         public static void StartMod()
         {
-            Debug.Log(LogLevel.Warning, "StartMod");
+            mod.StartMod();
         }
 
-        public static void UnrealInit()
-        {
-            Debug.Log(LogLevel.Warning, "UnrealInit");
-        }
-
-
-        public static void ProgramStart()
-        {
-            Debug.Log(LogLevel.Warning, "ProgramStart");
-
-     
-        }
     }
 }

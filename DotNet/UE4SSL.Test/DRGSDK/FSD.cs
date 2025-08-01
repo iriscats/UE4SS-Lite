@@ -1,5 +1,5 @@
-using UE4SSL.Test;
 using UE4SSL.Framework;
+using UE4SSL.Test.DRGSDK;
 
 public struct UGameFunctionLibrary
 {
