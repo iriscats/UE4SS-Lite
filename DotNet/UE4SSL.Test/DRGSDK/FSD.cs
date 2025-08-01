@@ -21,15 +21,36 @@ public class GameFunctionLibrary(IntPtr pointer) : ObjectBase<UGameFunctionLibra
         ];
         return new FSDGameMode(ProcessEvent<IntPtr>(GetFunction("GetFSDGameMode")!, @params));
     }
+
+    public FSDGameState GetFSDGameState(ObjectReference worldContextObject)
+    {
+        Span<(string name, object value)> @params =
+        [
+            ("WorldContextObject", worldContextObject)
+        ];
+        return new FSDGameState(ProcessEvent<IntPtr>(GetFunction("GetFSDGameState")!, @params));
+    }
 }
+
+
+public class FSDGameState(IntPtr pointer) : ObjectBase<UGameFunctionLibrary>(pointer)
+{
+    public void PostGameMessage(string msg)
+    {
+        Span<(string name, object value)> @params =
+        [
+            ("Msg", new ObjectReference().SetString())
+        ];
+        ProcessEvent<IntPtr>(GetFunction("PostGameMessage")!, @params);
+    }
+}
+
 
 public class FSDGameMode(IntPtr pointer) : ObjectBase<UGameFunctionLibrary>(pointer)
 {
     public DifficultyManager GetDifficultyManager()
     {
-        Span<(string name, object value)> @params =
-        [
-        ];
+        Span<(string name, object value)> @params =[];
         return new DifficultyManager(ProcessEvent<IntPtr>(GetFunction("GetDifficultyManager")!, @params));
     }
 }
@@ -40,8 +61,7 @@ public class DifficultyManager(IntPtr pointer) : ObjectBase<UGameFunctionLibrary
     
     public DifficultySetting GetCurrentDifficulty()
     {
-        Span<(string name, object value)> @params = [
-        ];
+        Span<(string name, object value)> @params = [];
         return new DifficultySetting(ProcessEvent<IntPtr>(GetFunction("GetCurrentDifficulty")!, @params));
     }
     

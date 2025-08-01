@@ -26,15 +26,10 @@ namespace UE4SSL.Test
 
             var gameFunctionLibrary = GameFunctionLibrary.GetInstance();
             var worldContext = Utils.GetWorldContext();
-            var gameMode = gameFunctionLibrary?.GetFSDGameMode(worldContext!);
+            var gameMode = gameFunctionLibrary?.GetFSDGameState(worldContext!);
             if (gameMode is not null)
             {
-                var difficultyManager = gameMode.GetDifficultyManager();
-                var currentDifficulty = difficultyManager.GetCurrentDifficulty();
-                foreach (var item in currentDifficulty.EnemyDamageResistance)
-                {
-                    Debug.Log(LogLevel.Error, item.ToString());
-                }
+               gameMode.PostGameMessage("Hello World");
             }
         }
     }
