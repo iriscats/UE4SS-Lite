@@ -13,6 +13,16 @@ namespace UE4SSL.Test
             OnInitCaveCallback += OnInitCave;
         }
 
+        public new void Update()
+        {
+            base.Update();
+
+            if (Hotkeys.IsPressed(Keys.K))
+            {
+                Debug.Log(LogLevel.Warning, "IsPressed K");
+            }
+
+        }
 
         public void OnInitCave()
         {
@@ -23,15 +33,19 @@ namespace UE4SSL.Test
         public void OnInitRigSpace()
         {
             Debug.Log(LogLevel.Warning, "OnInitRigSpace");
+        }
 
+        public void TestPostGameMessage()
+        {
             var gameFunctionLibrary = GameFunctionLibrary.GetInstance();
             var worldContext = Utils.GetWorldContext();
             var gameMode = gameFunctionLibrary?.GetFSDGameState(worldContext!);
             if (gameMode is not null)
             {
-               gameMode.PostGameMessage("Hello World");
+                gameMode.PostGameMessage("Hello World");
             }
         }
+
     }
 
 

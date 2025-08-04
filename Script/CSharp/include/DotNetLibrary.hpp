@@ -320,6 +320,12 @@ namespace RC::DotNetLibrary
             static void EditValueAt(UEnum* Enum, int Index, int64 Value);
             static void RemoveFromNamesAt(UEnum* Enum, int Index, int Count = 1, bool AllowShrinking = true);
         };
+
+        class CSHARPLOADER_API UnString
+        {
+            static FString* FromString(const char* Value);
+            //static const char* ToString(UnString* Value);
+        };
         
         class CSHARPLOADER_API Function : public Struct
         {

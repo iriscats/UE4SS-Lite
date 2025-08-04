@@ -10,7 +10,7 @@ using namespace RC::Unreal;
 class CSharpLoaderProxy : public CppUserModBase
 {
 public:
-    DotNetLibrary::Runtime* m_runtime;
+    DotNetLibrary::Runtime* m_runtime=nullptr;
     
     CSharpLoaderProxy()
     {

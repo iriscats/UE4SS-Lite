@@ -943,4 +943,16 @@ namespace UE4SSL.Framework
 			ObjectSerialNumber = objectSerialNumber;
 		}
 	}
+
+
+	public class StringReference
+    {
+		public static IntPtr FromString(string value) {
+
+			return UnString.FromString(value.StringToBytes());
+        }
+	
+	}
+
+
 }

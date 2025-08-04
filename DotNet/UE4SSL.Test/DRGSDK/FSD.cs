@@ -39,7 +39,7 @@ public class FSDGameState(IntPtr pointer) : ObjectBase<UGameFunctionLibrary>(poi
     {
         Span<(string name, object value)> @params =
         [
-            ("Msg", new ObjectReference().SetString())
+            ("Msg", StringReference.FromString(msg))
         ];
         ProcessEvent<IntPtr>(GetFunction("PostGameMessage")!, @params);
     }

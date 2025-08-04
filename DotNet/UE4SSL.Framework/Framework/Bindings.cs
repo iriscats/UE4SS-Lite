@@ -365,3 +365,10 @@ internal static class Function
 	[DllImport("UE4SSL.CSharp.dll", EntryPoint = "?GetReturnValueOffset@Function@Framework@DotNetLibrary@RC@@CAHPEAVUFunction@Unreal@4@@Z")]
 	internal static extern int GetReturnValueOffset(IntPtr func);
 }
+
+
+internal static class UnString
+{
+    [DllImport("UE4SSL.CSharp.dll", EntryPoint = "?FromString@UnString@Framework@DotNetLibrary@RC@@CAPEAVFString@Unreal@4@PEBD@Z")]
+    internal static extern IntPtr FromString(byte[] name);
+}

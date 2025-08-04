@@ -1,3 +1,5 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 #include <polyhook2/Detour/x64Detour.hpp>
 #include "DotNetLibrary.hpp"
 
@@ -991,5 +993,13 @@ namespace RC::DotNetLibrary
 				throw std::runtime_error{ std::format("ReturnProperty is null for '{}'", to_string(Func->GetFullName())) };
 			return returnProp->GetOffset_Internal();
 		}
+
+	
+		FString* UnString::FromString(const char* Value)
+		{
+			return new FString(to_wstring(Value).c_str());
+		}
+
+
 	}
 }
