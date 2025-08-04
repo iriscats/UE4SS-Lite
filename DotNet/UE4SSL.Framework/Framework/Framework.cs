@@ -945,14 +945,4 @@ namespace UE4SSL.Framework
 	}
 
 
-	public class StringReference
-    {
-		public static IntPtr FromString(string value) {
-
-			return UnString.FromString(value.StringToBytes());
-        }
-	
-	}
-
-
 }

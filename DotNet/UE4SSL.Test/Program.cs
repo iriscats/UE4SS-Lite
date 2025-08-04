@@ -20,6 +20,7 @@ namespace UE4SSL.Test
             if (Hotkeys.IsPressed(Keys.K))
             {
                 Debug.Log(LogLevel.Warning, "IsPressed K");
+                TestPostGameMessage();
             }
 
         }
@@ -42,7 +43,7 @@ namespace UE4SSL.Test
             var gameMode = gameFunctionLibrary?.GetFSDGameState(worldContext!);
             if (gameMode is not null)
             {
-                gameMode.PostGameMessage("Hello World");
+                gameMode.PostGameMessage("Hello World 你好世界");
             }
         }
 

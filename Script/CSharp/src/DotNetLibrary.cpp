@@ -994,12 +994,5 @@ namespace RC::DotNetLibrary
 			return returnProp->GetOffset_Internal();
 		}
 
-	
-		FString* UnString::FromString(const char* Value)
-		{
-			return new FString(to_wstring(Value).c_str());
-		}
-
-
 	}
 }
