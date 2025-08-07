@@ -279,7 +279,8 @@ public static unsafe class Core
                     {
                         config.DefaultContext = assembliesContextManager.assembliesContext;
                         config.IsUnloadable = true;
-                        config.LoadInMemory = true;
+                        config.LoadInMemory = false;
+
                     });
 
 

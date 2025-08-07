@@ -92,7 +92,6 @@ namespace UE4SSL.Test.DRGSDK
             Debug.Log(LogLevel.Warning, "UnrealInit");
         }
 
-
         public void ProgramStart()
         {
             Debug.Log(LogLevel.Warning, "ProgramStart");
