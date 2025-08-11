@@ -123,7 +123,7 @@ namespace UEInspector
 
         private void dumpSDK_Click(object sender, EventArgs e)
         {
-            UnrealEngine.Instance.DumpSdk();
+            //UnrealEngine.Instance.DumpSdk();
         }
     }
 }
