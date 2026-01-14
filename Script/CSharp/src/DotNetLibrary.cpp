@@ -22,6 +22,14 @@ namespace RC::DotNetLibrary
 	auto Runtime::log(LogLevel::LogLevel Level, const char* Message)
 	{
 		Framework::Debug::Log(Level, Message);
+
+
+		Unreal::Hook::RegisterBeginPlayPreCallback([]([[maybe_unused]] Unreal::AActor* Context) {
+			TRY([&] {
+				
+
+				});
+			});
 	}
 
 	void Runtime::add_unreal_init_callback(void (*Callback)())
@@ -38,7 +46,10 @@ namespace RC::DotNetLibrary
 	{
 		Output::send<LogLevel::Error>(STR("initialize CoreCLR\n"));
 		int success = 0;
-		CLR = new CoreCLR(&success);
+
+		// dotnet directory is at the same level as m_runtime_directory
+		const string_t dotnet_root = m_runtime_directory + L"\\dotnet";
+		CLR = new CoreCLR(dotnet_root, &success);
 
 		if (!success)
 		{

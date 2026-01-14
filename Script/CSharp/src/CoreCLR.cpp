@@ -5,21 +5,27 @@
 
 #pragma commit(lib, "advapi32.lib")
 
-CoreCLR::CoreCLR(int* success)
+CoreCLR::CoreCLR(const string_t& dotnet_root, int* success)
 {
-	if (load_hostfxr())
+	if (load_hostfxr(dotnet_root))
 		*success = 1;
 
 	success = 0;
 }
 
 /* Core public functions */
-bool CoreCLR::load_hostfxr()
+bool CoreCLR::load_hostfxr(const string_t& dotnet_root)
 {
-	// Get the path to CoreCLR's hostfxr
+	// Get the path to CoreCLR's hostfxr using the specified dotnet_root
 	char_t buffer[MAX_PATH];
 	size_t buffer_size = sizeof(buffer) / sizeof(char_t);
-	int rc = get_hostfxr_path(buffer, &buffer_size, NULL);
+
+	struct get_hostfxr_parameters params{};
+	params.size = sizeof(struct get_hostfxr_parameters);
+	params.assembly_path = nullptr;
+	params.dotnet_root = dotnet_root.c_str();
+
+	int rc = get_hostfxr_path(buffer, &buffer_size, &params);
 	if (rc != 0)
 		return false;
 

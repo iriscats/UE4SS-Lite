@@ -13,9 +13,10 @@ class CoreCLR
 	public:
 
 		/**
+		 * \param dotnet_root The path to the dotnet root directory (containing hostfxr).
 		 * \param success This value returns 1 if the constructor has successfully ran, else 0.
 		 */
-		CoreCLR(int* success);
+		CoreCLR(const string_t& dotnet_root, int* success);
 		~CoreCLR() = default;
 
 		/**
@@ -49,5 +50,5 @@ class CoreCLR
 		load_assembly_and_get_function_pointer_fn get_dotnet_load_assembly(const char_t* config_path);
 
 		/**  Using the nethost library, discovers the location of hostfxr and retrieves function exports. */
-		bool load_hostfxr();
+		bool load_hostfxr(const string_t& dotnet_root);
 };

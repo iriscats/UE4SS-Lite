@@ -4,14 +4,14 @@
 
 auto default_setting = LR""""(
 [General]
-EnableHotReloadSystem = 0
+EnableHotReloadSystem = 1
 UseCache = 1
 InvalidateCacheIfDLLDiffers = 1
 SecondsToScanBeforeGivingUp = 30
 bUseUObjectArrayCache = true
 
 [Debug]
-ConsoleEnabled = 1
+ConsoleEnabled = 0
 
 [Threads]
 SigScannerNumThreads = 8
@@ -73,15 +73,23 @@ FullMemoryDump = 0
 
 namespace RC
 {
+
+
     auto SettingsManager::deserialize(std::filesystem::path& file_name) -> void
     {
-
-        //auto file = File::open(file_name, File::OpenFor::Reading, File::OverwriteExistingFile::No, File::CreateIfNonExistent::Yes);
-         
-        StringType setting(default_setting);
         Ini::Parser parser;
-        parser.parse(setting);
-        //file.close();
+
+        try
+        {
+            auto file = File::open(file_name, File::OpenFor::Reading, File::OverwriteExistingFile::No, File::CreateIfNonExistent::No);
+            parser.parse(file);
+            file.close();
+        }
+        catch (std::exception&)
+        {
+            StringType setting(default_setting);
+            parser.parse(setting);
+        }
 
         // constexpr static File::CharType section_overrides[] = STR("Overrides");
         // REGISTER_STRING_SETTING(Overrides.ModsFolderPath, section_overrides, ModsFolderPath)
@@ -119,6 +127,7 @@ namespace RC
         REGISTER_BOOL_SETTING(Debug.DebugConsoleEnabled, section_debug, GuiConsoleEnabled)
         REGISTER_BOOL_SETTING(Debug.DebugConsoleVisible, section_debug, GuiConsoleVisible)
         REGISTER_FLOAT_SETTING(Debug.DebugGUIFontScaling, section_debug, GuiConsoleFontScaling)
+
         StringType graphics_api_string{};
         REGISTER_STRING_SETTING(graphics_api_string, section_debug, GraphicsAPI)
 
