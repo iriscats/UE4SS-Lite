@@ -31,17 +31,35 @@ namespace RC::JSScript
             JSValue callback;  // Reference to JS callback function
             int32_t ref_id;    // Registry reference ID
         };
+        
+        // Timer data for setTimeout/setInterval
+        struct TimerCallback
+        {
+            JSContext* ctx;
+            JSValue callback;       // Reference to JS callback function
+            int32_t id;             // Timer ID
+            double trigger_time;    // When to trigger (in seconds since start)
+            double interval;        // Interval for setInterval (0 for setTimeout)
+            bool is_interval;       // true = setInterval, false = setTimeout
+            bool cancelled;         // Timer was cancelled
+        };
 
     public:
         // Hook management (public for access from global functions)
         std::vector<HookCallback> m_hook_callbacks;
         std::mutex m_hooks_mutex;
         
+        // Timer management (public for access from global functions)
+        std::vector<TimerCallback> m_timers;
+        std::mutex m_timers_mutex;
+        int32_t m_next_timer_id{1};
+        double m_start_time{0.0};
+        
         // Module cache (public for access from module loader)
         std::unordered_map<std::string, bool> m_loaded_modules;
 
     private:
-        std::filesystem::path m_scripts_path;
+        std::filesystem::path m_mods_directory;
         JSRuntime* m_runtime{nullptr};
         JSContext* m_main_ctx{nullptr};
         
@@ -52,7 +70,9 @@ namespace RC::JSScript
         ~JSMod();
 
         // Lifecycle
-        auto start() -> bool;
+        auto start() -> bool;           // Full start (init + load scripts) - for backward compatibility
+        auto init_engine() -> bool;     // Initialize engine only (safe before UE init)
+        auto load_scripts() -> void;    // Load and execute scripts (call after UE init)
         auto stop() -> void;
         auto tick() -> void;  // Called every frame
         
@@ -60,11 +80,17 @@ namespace RC::JSScript
         auto load_and_execute_script(const std::filesystem::path& script_path) -> bool;
         auto execute_string(const std::string& code, const std::string& filename = "<eval>") -> bool;
         
+        // Timer management
+        auto add_timer(JSContext* ctx, JSValue callback, double delay_ms, bool is_interval) -> int32_t;
+        auto cancel_timer(int32_t id) -> bool;
+        auto process_timers() -> void;
+        
         // Getters
         [[nodiscard]] auto get_runtime() const -> JSRuntime* { return m_runtime; }
         [[nodiscard]] auto get_main_context() const -> JSContext* { return m_main_ctx; }
-        [[nodiscard]] auto get_scripts_path() const -> const std::filesystem::path& { return m_scripts_path; }
+        [[nodiscard]] auto get_mods_directory() const -> const std::filesystem::path& { return m_mods_directory; }
         [[nodiscard]] auto is_initialized() const -> bool { return m_initialized; }
+        [[nodiscard]] auto get_current_time() const -> double;
 
     private:
         // Initialization

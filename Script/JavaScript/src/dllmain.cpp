@@ -6,24 +6,43 @@
 
 #include "JSMod.hpp"
 
+using namespace RC;
+
 /**
  * JSScriptMod - C++ mod entry point for JavaScript scripting support
  * 
  * This mod provides JavaScript scripting capabilities to UE4SS using QuickJS,
  * similar to the built-in Lua scripting support.
  */
-class JSScriptMod : public RC::CppUserModBase
+class JSScriptMod : public CppUserModBase
 {
 private:
-    std::unique_ptr<RC::JSScript::JSMod> m_js_mod;
+    std::unique_ptr<JSScript::JSMod> m_js_mod;
+    bool m_scripts_loaded = false;
 
 public:
     JSScriptMod() : CppUserModBase()
     {
-        ModName = STR("JSScript");
+        ModName = STR("UE4SSL.JavaScript");
         ModVersion = STR("1.0.0");
         ModDescription = STR("JavaScript scripting support via QuickJS engine");
         ModAuthors = STR("UE4SS Community");
+        
+        Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Initializing JavaScript engine...\n"));
+        
+        // Only initialize the runtime, but don't load scripts yet
+        // Scripts will be loaded in on_unreal_init when UE is ready
+        m_js_mod = std::make_unique<JSScript::JSMod>();
+        
+        if (m_js_mod->init_engine())
+        {
+            Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] JavaScript engine initialized successfully\n"));
+            Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Waiting for on_unreal_init to load scripts...\n"));
+        }
+        else
+        {
+            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] Failed to initialize JavaScript engine\n"));
+        }
     }
 
     ~JSScriptMod() override
@@ -36,21 +55,17 @@ public:
 
     /**
      * Called when UE4 is fully initialized
-     * This is where we initialize the JavaScript engine
+     * This is the safe time to execute scripts that access UE objects
      */
     auto on_unreal_init() -> void override
     {
-        RC::Output::send<RC::LogLevel::Normal>(STR("[JSScript] Initializing JavaScript engine...\n"));
+        Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] on_unreal_init called - Unreal is ready\n"));
         
-        m_js_mod = std::make_unique<RC::JSScript::JSMod>();
-        
-        if (m_js_mod->start())
+        // Now it's safe to load and execute scripts
+        if (m_js_mod && m_js_mod->is_initialized() && !m_scripts_loaded)
         {
-            RC::Output::send<RC::LogLevel::Normal>(STR("[JSScript] JavaScript engine initialized successfully\n"));
-        }
-        else
-        {
-            RC::Output::send<RC::LogLevel::Error>(STR("[JSScript] Failed to initialize JavaScript engine\n"));
+            m_js_mod->load_scripts();
+            m_scripts_loaded = true;
         }
     }
 
@@ -71,26 +86,24 @@ public:
      */
     auto on_program_start() -> void override
     {
-        RC::Output::send<RC::LogLevel::Normal>(STR("[JSScript] JSScript mod loaded\n"));
+        Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] on_program_start called\n"));
     }
 };
 
 // DLL export functions
-#ifdef _WIN32
 #define JS_SCRIPT_MOD_API __declspec(dllexport)
-#else
-#define JS_SCRIPT_MOD_API __attribute__((visibility("default")))
-#endif
 
 extern "C"
 {
-    JS_SCRIPT_MOD_API RC::CppUserModBase* start_mod()
+    JS_SCRIPT_MOD_API CppUserModBase* start_mod()
     {
+        Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] start_mod called\n"));
         return new JSScriptMod();
     }
 
-    JS_SCRIPT_MOD_API void uninstall_mod(RC::CppUserModBase* mod)
+    JS_SCRIPT_MOD_API void uninstall_mod(CppUserModBase* mod)
     {
+        Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] uninstall_mod called\n"));
         delete mod;
     }
 }
