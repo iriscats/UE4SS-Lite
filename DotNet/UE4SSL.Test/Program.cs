@@ -1,12 +1,12 @@
-﻿using System.Runtime.InteropServices;
-using System.Text.Json;
+﻿using System.Text.Json;
 using UE4SSL.Framework;
 using UE4SSL.Test.DRGSDK;
 
 namespace UE4SSL.Test
 {
 
-    class MyMod : DRGMod {
+    class MyMod : DRGMod
+    {
 
         public MyMod()
         {
@@ -21,7 +21,8 @@ namespace UE4SSL.Test
             if (Hotkeys.IsPressed(Keys.K))
             {
                 Debug.Log(LogLevel.Warning, "IsPressed K");
-                TestPostGameMessage("Hello World 你好世界");
+                //TestPostGameMessage("Hello World 你好世界");
+                TestModifyWeapon();
             }
 
             if (Hotkeys.IsPressed(Keys.L))
@@ -51,6 +52,21 @@ namespace UE4SSL.Test
             if (gameMode is not null)
             {
                 gameMode.PostGameMessage(msg);
+            }
+        }
+
+
+        public void TestModifyWeapon()
+        {
+            var ptr = ObjectReference.Find("/Game/WeaponsNTools/Autocannon/WPN_Autocannon.Default__WPN_Autocannon_C");
+            var autoCannon = new AutoCannon(ptr!.Pointer);
+            if (autoCannon is not null) {
+                autoCannon.MaxAmmo = autoCannon.MaxAmmo * 10;
+                Debug.Log(LogLevel.Warning, "" + autoCannon.MaxAmmo);
+
+                var ptr1 = ObjectReference.Find("/Game/WeaponsNTools/Autocannon/WPN_Autocannon.WPN_Autocannon_C:Damage_GEN_VARIABLE");
+                var damage = new DamageComponent(ptr1!.Pointer);
+                damage.Damage = 100;
             }
         }
 

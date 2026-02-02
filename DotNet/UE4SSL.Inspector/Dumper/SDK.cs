@@ -12,6 +12,7 @@ namespace UE4SSL.Inspector.Dumper
     /// </remarks>
     internal class SDK
     {
+        public static List<string> AllEnumNames { get; } = new List<string>();
         #region 公共方法
 
         /// <summary>
@@ -133,16 +134,19 @@ namespace UE4SSL.Inspector.Dumper
 
             foreach (var p in dumpedPackages)
             {
-                GeneratePackageFiles(p, location);
+                if (p.Name == "FSD")
+                {
+                    GeneratePackageFiles(p, location);
+                }
             }
         }
 
-            /// <summary>
-            /// 为单个包生成SDK文件
-            /// </summary>
-            /// <param name="package">包对象</param>
-            /// <param name="location">输出位置</param>
-            private static void GeneratePackageFiles(Package package, string location)
+        /// <summary>
+        /// 为单个包生成SDK文件
+        /// </summary>
+        /// <param name="package">包对象</param>
+        /// <param name="location">输出位置</param>
+        private static void GeneratePackageFiles(Package package, string location)
         {
             // 创建StringBuilder用于构建文件内容
             var sb = new StringBuilder();
@@ -228,68 +232,383 @@ namespace UE4SSL.Inspector.Dumper
             sb.AppendLine("    }");
         }
 
-        /// <summary>
-        /// 生成类代码
-        /// </summary>
-        /// <param name="sb">StringBuilder对象</param>
-        /// <param name="sdkClass">SDK类对象</param>
+        ///// <summary>
+        ///// 生成类代码
+        ///// </summary>
+        ///// <param name="sb">StringBuilder对象</param>
+        ///// <param name="sdkClass">SDK类对象</param>
+        //private static void GenerateClassCode(StringBuilder sb, Package.SDKClass sdkClass)
+        //{
+        //    sb.AppendLine("    public " + sdkClass.SdkType + " " + sdkClass.Name + ((sdkClass.Parent == null) ? "" : (" : " + sdkClass.Parent)));
+        //    sb.AppendLine("    {");
+
+        //    // 添加构造函数
+        //    sb.AppendLine("        public " + sdkClass.Name + "(nint addr) : base(addr) { }");
+
+        //    // 生成字段
+        //    foreach (var field in sdkClass.Fields)
+        //    {
+        //        // 跳过特定字段（临时解决方案）
+        //        if (field.Name == "RelatedPlayerState") continue;
+
+        //        sb.AppendLine("        public " + field.Type + " " + field.Name + " " + field.GetterSetter);
+        //    }
+
+        //    // 生成函数
+        //    GenerateClassFunctionCode(sb, sdkClass);
+
+        //    sb.AppendLine("    }");
+        //}
+
+        ///// <summary>
+        ///// 生成类函数代码
+        ///// </summary>
+        ///// <param name="sb">StringBuilder对象</param>
+        ///// <param name="sdkClass">SDK类对象</param>
+        //private static void GenerateClassFunctionCode(StringBuilder sb, Package.SDKClass sdkClass)
+        //{
+        //    foreach (var function in sdkClass.Functions)
+        //    {
+        //        // 跳过特定函数（临时解决方案）
+        //        if (function.Name == "ClientReceiveLocalizedMessage") continue;
+
+        //        // 确定返回类型
+        //        var returnType = function.Params.FirstOrDefault(pa => pa.Name == "ReturnValue")?.Type ?? "void";
+
+        //        // 构建参数列表
+        //        var parameters = String.Join(", ", function.Params.FindAll(pa => pa.Name != "ReturnValue").Select(pa => pa.Type + " " + pa.Name));
+
+        //        // 构建参数名称列表
+        //        var args = function.Params.FindAll(pa => pa.Name != "ReturnValue").Select(pa => pa.Name).ToList();
+        //        args.Insert(0, "nameof(" + function.Name + ")");
+        //        var argList = String.Join(", ", args);
+
+        //        // 确定返回类型模板
+        //        var returnTypeTemplate = returnType == "void" ? "" : ("<" + returnType + ">");
+
+        //        // 生成函数声明和实现
+        //        sb.AppendLine("        public " + returnType + " " + function.Name + "(" + parameters + ") { " +
+        //            (returnType == "void" ? "" : "return ") + "Invoke" + returnTypeTemplate + "(" + argList + "); }");
+        //    }
+        //}
+
         private static void GenerateClassCode(StringBuilder sb, Package.SDKClass sdkClass)
         {
-            sb.AppendLine("    public " + sdkClass.SdkType + " " + sdkClass.Name + ((sdkClass.Parent == null) ? "" : (" : " + sdkClass.Parent)));
+            //sb.AppendLine($"    public class {sdkClass.Name}(IntPtr pointer) : ObjectBase<UGameFunctionLibrary>(pointer)");
+            // 类声明
+            if (!string.IsNullOrEmpty(sdkClass.Parent) && sdkClass.Parent != "Object")
+                sb.AppendLine($"    public {sdkClass.SdkType} {sdkClass.Name}(nint pointer) : {sdkClass.Parent}(pointer)");
+            else if (!string.IsNullOrEmpty(sdkClass.Parent))
+                sb.AppendLine($"    public {sdkClass.SdkType} {sdkClass.Name}(nint pointer) : {sdkClass.Parent}");
+            else
+                sb.AppendLine($"    public {sdkClass.SdkType} {sdkClass.Name}(nint pointer)");
+
             sb.AppendLine("    {");
 
-            // 添加构造函数
-            sb.AppendLine("        public " + sdkClass.Name + "(nint addr) : base(addr) { }");
+            // 构造函数（仅class类型生成）
+            //if (sdkClass.SdkType == "class")
+            //{
+            //    sb.AppendLine($"        public {sdkClass.Name}(nint pointer) : base(pointer)");
+            //    sb.AppendLine("        {");
+            //    sb.AppendLine("        }");
+            //}
 
-            // 生成字段
             foreach (var field in sdkClass.Fields)
             {
-                // 跳过特定字段（临时解决方案）
-                if (field.Name == "RelatedPlayerState") continue;
+                var type = field.Type;
+                var name = field.Name;
 
-                sb.AppendLine("        public " + field.Type + " " + field.Name + " " + field.GetterSetter);
+                // 支持 T[] 和 Array<T> 两种数组类型
+                if (type.EndsWith("[]") || (type.StartsWith("Array<") && type.EndsWith(">")))
+                {
+                    string elementType;
+                    if (type.EndsWith("[]"))
+                        elementType = type.Substring(0, type.Length - 2);
+                    else
+                        elementType = type.Substring(6, type.Length - 7);
+
+                    if (elementType == "Object")
+                    {
+                        sb.AppendLine($"        public Object[] {name}");
+                        sb.AppendLine("        {");
+                        sb.AppendLine("            get");
+                        sb.AppendLine("            {");
+                        sb.AppendLine("                UnArray array = new UnArray();");
+                        sb.AppendLine($"                GetArray(\"{name}\", ref array);");
+                        sb.AppendLine("                return array.DataToArray<Object>().ToArray();");
+                        sb.AppendLine("            }");
+                        sb.AppendLine("            set");
+                        sb.AppendLine("            {");
+                        sb.AppendLine("                UnArray array = new UnArray();");
+                        sb.AppendLine("                array.ArrayToData(value ?? Array.Empty<Object>());");
+                        sb.AppendLine($"                SetArray(\"{name}\", array);");
+                        sb.AppendLine("            }");
+                        sb.AppendLine("        }");
+                    }
+                    else
+                    {
+                        sb.AppendLine($"        public {elementType}[] {name}");
+                        sb.AppendLine("        {");
+                        sb.AppendLine("            get");
+                        sb.AppendLine("            {");
+                        sb.AppendLine("                UnArray array = new UnArray();");
+                        sb.AppendLine($"                GetArray(\"{name}\", ref array);");
+                        sb.AppendLine($"                return array.DataToArray<{elementType}>();");
+                        sb.AppendLine("            }");
+                        sb.AppendLine("            set");
+                        sb.AppendLine("            {");
+                        sb.AppendLine("                UnArray array = new UnArray();");
+                        sb.AppendLine("                array.ArrayToData(value);");
+                        sb.AppendLine($"                SetArray(\"{name}\", array);");
+                        sb.AppendLine("            }");
+                        sb.AppendLine("        }");
+                    }
+                }
+                // bool类型专用处理
+                else if (type == "bool")
+                {
+                    sb.AppendLine($"        public bool {name}");
+                    sb.AppendLine("        {");
+                    sb.AppendLine("            get");
+                    sb.AppendLine("            {");
+                    sb.AppendLine("                bool b = false;");
+                    sb.AppendLine($"                GetBool(\"{name}\", ref b);");
+                    sb.AppendLine("                return b;");
+                    sb.AppendLine("            }");
+                    sb.AppendLine("            set");
+                    sb.AppendLine("            {");
+                    sb.AppendLine($"                SetBool(\"{name}\", value);");
+                    sb.AppendLine("            }");
+                    sb.AppendLine("        }");
+                }
+                // int类型专用处理
+                else if (type == "int")
+                {
+                    sb.AppendLine($"        public int {name}");
+                    sb.AppendLine("        {");
+                    sb.AppendLine("            get");
+                    sb.AppendLine("            {");
+                    sb.AppendLine("                int i = int.MinValue;");
+                    sb.AppendLine($"                GetInt(\"{name}\", ref i);");
+                    sb.AppendLine("                return i;");
+                    sb.AppendLine("            }");
+                    sb.AppendLine("            set");
+                    sb.AppendLine("            {");
+                    sb.AppendLine($"                SetInt(\"{name}\", value);");
+                    sb.AppendLine("            }");
+                    sb.AppendLine("        }");
+                }
+                // 非数组Object类型
+                else if (type == "Object")
+                {
+                    sb.AppendLine($"        public Object {name}");
+                    sb.AppendLine("        {");
+                    sb.AppendLine("            get");
+                    sb.AppendLine("            {");
+                    sb.AppendLine($"                return GetObjectReference(\"{name}\");");
+                    sb.AppendLine("            }");
+                    sb.AppendLine("            set");
+                    sb.AppendLine("            {");
+                    sb.AppendLine($"                SetObjectReference(\"{name}\", (ObjectReference)value);");
+                    sb.AppendLine("            }");
+                    sb.AppendLine("        }");
+                }
+                // float类型专用处理
+                else if (type == "float")
+                {
+                    sb.AppendLine($"        public float {name}");
+                    sb.AppendLine("        {");
+                    sb.AppendLine("            get");
+                    sb.AppendLine("            {");
+                    sb.AppendLine("                float f = float.MinValue;");
+                    sb.AppendLine($"                GetFloat(\"{name}\", ref f);");
+                    sb.AppendLine("                return f;");
+                    sb.AppendLine("            }");
+                    sb.AppendLine("            set");
+                    sb.AppendLine("            {");
+                    sb.AppendLine($"                SetFloat(\"{name}\", value);");
+                    sb.AppendLine("            }");
+                    sb.AppendLine("        }");
+                }
+                // double类型专用处理
+                else if (type == "double")
+                {
+                    sb.AppendLine($"        public double {name}");
+                    sb.AppendLine("        {");
+                    sb.AppendLine("            get");
+                    sb.AppendLine("            {");
+                    sb.AppendLine("                double d = double.MinValue;");
+                    sb.AppendLine($"                GetDouble(\"{name}\", ref d);");
+                    sb.AppendLine("                return d;");
+                    sb.AppendLine("            }");
+                    sb.AppendLine("            set");
+                    sb.AppendLine("            {");
+                    sb.AppendLine($"                SetDouble(\"{name}\", value);");
+                    sb.AppendLine("            }");
+                    sb.AppendLine("        }");
+                }
+                // byte类型专用处理
+                else if (type == "byte")
+                {
+                    sb.AppendLine($"        public byte {name}");
+                    sb.AppendLine("        {");
+                    sb.AppendLine("            get");
+                    sb.AppendLine("            {");
+                    sb.AppendLine("                byte b = byte.MinValue;");
+                    sb.AppendLine($"                GetByte(\"{name}\", ref b);");
+                    sb.AppendLine("                return b;");
+                    sb.AppendLine("            }");
+                    sb.AppendLine("            set");
+                    sb.AppendLine("            {");
+                    sb.AppendLine($"                SetByte(\"{name}\", value);");
+                    sb.AppendLine("            }");
+                    sb.AppendLine("        }");
+                }
+                // uint类型专用处理
+                else if (type == "uint")
+                {
+                    sb.AppendLine($"        public uint {name}");
+                    sb.AppendLine("        {");
+                    sb.AppendLine("            get");
+                    sb.AppendLine("            {");
+                    sb.AppendLine("                uint u = uint.MinValue;");
+                    sb.AppendLine($"                GetUInt(\"{name}\", ref u);");
+                    sb.AppendLine("                return u;");
+                    sb.AppendLine("            }");
+                    sb.AppendLine("            set");
+                    sb.AppendLine("            {");
+                    sb.AppendLine($"                SetUInt(\"{name}\", value);");
+                    sb.AppendLine("            }");
+                    sb.AppendLine("        }");
+                }
+                // 枚举类型专用处理
+                else if (SDK.AllEnumNames.Contains(type))
+                {
+                    sb.AppendLine($"        public {type} {name}");
+                    sb.AppendLine("        {");
+                    sb.AppendLine("            get");
+                    sb.AppendLine("            {");
+                    sb.AppendLine($"                var e = new {type}();");
+                    sb.AppendLine($"                GetEnum<{type}>(\"{name}\", ref e);");
+                    sb.AppendLine("                return e;");
+                    sb.AppendLine("            }");
+                    sb.AppendLine("            set");
+                    sb.AppendLine("            {");
+                    sb.AppendLine($"                SetEnum(\"{name}\", value);");
+                    sb.AppendLine("            }");
+                    sb.AppendLine("        }");
+                }
+                // DateTime类型专用处理
+                else if (type == "DateTime" || type == "UEDateTime")
+                {
+                    sb.AppendLine($"        public DateTime {name}");
+                    sb.AppendLine("        { get; set; }");
+                }
+                // 非数组其它类型（如 MissionShouts）
+                else
+                {
+                    sb.AppendLine($"        public {type} {name}");
+                    sb.AppendLine("        {");
+                    sb.AppendLine("            get");
+                    sb.AppendLine("            {");
+                    sb.AppendLine($"                return ({type})GetObjectReference(\"{name}\");");
+                    sb.AppendLine("            }");
+                    sb.AppendLine("            set");
+                    sb.AppendLine("            {");
+                    sb.AppendLine($"                SetObjectReference(\"{name}\", (ObjectReference)value);");
+                    sb.AppendLine("            }");
+                    sb.AppendLine("        }");
+                }
             }
 
-            // 生成函数
             GenerateClassFunctionCode(sb, sdkClass);
 
             sb.AppendLine("    }");
         }
 
-        /// <summary>
-        /// 生成类函数代码
-        /// </summary>
-        /// <param name="sb">StringBuilder对象</param>
-        /// <param name="sdkClass">SDK类对象</param>
         private static void GenerateClassFunctionCode(StringBuilder sb, Package.SDKClass sdkClass)
         {
             foreach (var function in sdkClass.Functions)
             {
-                // 跳过特定函数（临时解决方案）
                 if (function.Name == "ClientReceiveLocalizedMessage") continue;
 
-                // 确定返回类型
-                var returnType = function.Params.FirstOrDefault(pa => pa.Name == "ReturnValue")?.Type ?? "void";
+                var returnParam = function.Params.FirstOrDefault(pa => pa.Name == "ReturnValue");
+                var returnType = returnParam?.Type ?? "void";
 
-                // 构建参数列表
-                var parameters = String.Join(", ", function.Params.FindAll(pa => pa.Name != "ReturnValue").Select(pa => pa.Type + " " + pa.Name));
+                var parameters = String.Join(", ", function.Params
+                    .Where(pa => pa.Name != "ReturnValue")
+                    .Select(pa =>
+                        (pa.Type.StartsWith("Array<")
+                            ? $"List<{pa.Type.Substring(6, pa.Type.Length - 7)}>"
+                            : pa.Type)
+                        + " " + pa.Name));
 
-                // 构建参数名称列表
-                var args = function.Params.FindAll(pa => pa.Name != "ReturnValue").Select(pa => pa.Name).ToList();
-                args.Insert(0, "nameof(" + function.Name + ")");
-                var argList = String.Join(", ", args);
+                var actualReturnType = returnType.StartsWith("Array<")
+                    ? $"List<{returnType.Substring(6, returnType.Length - 7)}>"
+                    : returnType;
 
-                // 确定返回类型模板
-                var returnTypeTemplate = returnType == "void" ? "" : ("<" + returnType + ">");
+                sb.AppendLine($"        public {actualReturnType} {function.Name}({parameters})");
+                sb.AppendLine("        {");
+                sb.AppendLine("            Span<(string name, object value)> @params = [");
+                foreach (var param in function.Params)
+                {
+                    if (param.Name != "ReturnValue")
+                        sb.AppendLine($"                (\"{param.Name}\", {param.Name}),");
+                }
+                sb.AppendLine("            ];");
 
-                // 生成函数声明和实现
-                sb.AppendLine("        public " + returnType + " " + function.Name + "(" + parameters + ") { " +
-                    (returnType == "void" ? "" : "return ") + "Invoke" + returnTypeTemplate + "(" + argList + "); }");
+                if (returnType == "void")
+                {
+                    sb.AppendLine($"            ProcessEvent(GetFunction(\"{function.Name}\")!, @params);");
+                }
+                else if (returnType == "Object")
+                {
+                    sb.AppendLine($"            return ProcessEvent<IntPtr>(GetFunction(\"{function.Name}\")!, @params);");
+                }
+                else if (returnType == "int")
+                {
+                    sb.AppendLine($"            return ProcessEvent<int>(GetFunction(\"{function.Name}\")!, @params);");
+                }
+                else if (returnType == "long")
+                {
+                    sb.AppendLine($"            return ProcessEvent<IntPtr>(GetFunction(\"{function.Name}\")!, @params).ToInt64();");
+                }
+                else if (returnType == "bool")
+                {
+                    sb.AppendLine($"            return ProcessEvent<bool>(GetFunction(\"{function.Name}\")!, @params);");
+                }
+                else if (returnType == "float")
+                {
+                    sb.AppendLine($"            return ProcessEvent<float>(GetFunction(\"{function.Name}\")!, @params);");
+                }
+                else if (returnType == "byte")
+                {
+                    sb.AppendLine($"            return (byte)ProcessEvent<IntPtr>(GetFunction(\"{function.Name}\")!, @params);");
+                }
+                else if (returnType == "ObjectReference")
+                {
+                    sb.AppendLine($"            return new ObjectReference(ProcessEvent<IntPtr>(GetFunction(\"{function.Name}\")!, @params));");
+                }
+                else if (SDK.AllEnumNames.Contains(returnType))
+                {
+                    sb.AppendLine($"            return ({returnType})ProcessEvent<IntPtr>(GetFunction(\"{function.Name}\")!, @params);");
+                }
+                else if (returnType.StartsWith("Array<"))
+                {
+                    var elementType = returnType.Substring(6, returnType.Length - 7);
+                    sb.AppendLine($"            UnArray array = new UnArray();");
+                    sb.AppendLine($"            GetArray(\"{function.Name}\", ref array);");
+                    sb.AppendLine($"            return array.DataToArray<{elementType}>().ToList();");
+                }
+                else
+                {
+                    sb.AppendLine($"            return new {returnType}(ProcessEvent<IntPtr>(GetFunction(\"{function.Name}\")!, @params));");
+                }
+                sb.AppendLine("        }");
             }
         }
-             
-    
-      
+
+
 
 
         /// <summary>
@@ -513,6 +832,10 @@ namespace UE4SSL.Inspector.Dumper
 
                 var enumVal = UnrealEngine.Memory.ReadProcessMemory<int>(enumArray + i * 0x10 + 0x8);
                 sdkClass.Fields.Add(new Package.SDKClass.SDKFields { Name = enumName, EnumVal = enumVal });
+
+                // 记录所有枚举名
+                if (!AllEnumNames.Contains(sdkClass.Name))
+                    AllEnumNames.Add(sdkClass.Name);
             }
         }
 
