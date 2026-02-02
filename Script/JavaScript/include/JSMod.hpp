@@ -8,10 +8,10 @@
 #include <mutex>
 #include <thread>
 
-// Forward declare QuickJS types to avoid including quickjs.h in header
-struct JSRuntime;
-struct JSContext;
-typedef uint64_t JSValue;
+// QuickJS headers
+extern "C" {
+#include "quickjs.h"
+}
 
 namespace RC::JSScript
 {

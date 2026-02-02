@@ -127,8 +127,9 @@ namespace RC::JSScript
             return JS_FALSE;
         }
 
-        // Check if object is still valid (not pending kill, etc.)
-        return JS_NewBool(ctx, data->object->IsValid());
+        // Check if object pointer is valid (basic null check)
+        // More sophisticated checks could be added using UObjectArray::IsValid
+        return JS_NewBool(ctx, data->object != nullptr);
     }
 
     // Get object name
@@ -188,8 +189,11 @@ namespace RC::JSScript
 
     // Class definition
     static JSClassDef js_uobject_class_def = {
-        "UObject",
+        .class_name = "UObject",
         .finalizer = js_uobject_finalizer,
+        .gc_mark = nullptr,
+        .call = nullptr,
+        .exotic = nullptr,
     };
 
     auto JSUObject::init_class(JSContext* ctx) -> void

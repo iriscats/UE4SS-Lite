@@ -1,7 +1,7 @@
-target("JSScriptMod")
-    set_kind("shared")
-    set_languages("cxx20", "c17")
+target("UE4SSL.JavaScript")
+    add_rules("ue4ss.mod")
     
+    -- 添加头文件搜索路径
     add_includedirs("include", "deps/quickjs")
     add_headerfiles("include/**.hpp")
     
@@ -29,5 +29,3 @@ target("JSScriptMod")
     if is_plat("windows") then
         add_cflags("/wd4244", "/wd4267", "/wd4996", "/wd4018", "/wd4146", "/wd4334", {tools = "cl"})
     end
-    
-    add_deps("UE4SS")
