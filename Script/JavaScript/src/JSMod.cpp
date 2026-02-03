@@ -12,6 +12,9 @@
 #include <Unreal/UClass.hpp>
 #include <Unreal/UFunction.hpp>
 #include <Unreal/FProperty.hpp>
+#include <Unreal/UFunctionStructs.hpp>
+#include <Unreal/FFrame.hpp>
+#include <Unreal/UnrealFlags.hpp>
 
 // QuickJS headers
 extern "C" {
@@ -27,6 +30,8 @@ namespace RC::JSScript
     static JSValue js_find_all_of(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
     static JSValue js_static_find_object(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
     static JSValue js_register_hook(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
+    static JSValue js_hook_ufunction(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
+    static JSValue js_unregister_hook(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
     static JSValue js_notify_on_new_object(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
     
     // Timer functions
@@ -140,7 +145,40 @@ namespace RC::JSScript
 
         Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Stopping JavaScript engine...\n"));
 
-        // Clean up hook callbacks
+        // Clean up UFunction hooks
+        {
+            std::lock_guard<std::mutex> lock(m_ufunction_hooks_mutex);
+            for (auto& hook : m_ufunction_hooks)
+            {
+                if (hook && hook->function)
+                {
+                    // Unregister the hooks from UE4SS
+                    if (hook->pre_id != 0)
+                    {
+                        hook->function->UnregisterHook(hook->pre_id);
+                    }
+                    if (hook->post_id != 0)
+                    {
+                        hook->function->UnregisterHook(hook->post_id);
+                    }
+                    // Free JS callback values
+                    if (hook->ctx)
+                    {
+                        if (!JS_IsUndefined(hook->pre_callback))
+                        {
+                            JS_FreeValue(hook->ctx, hook->pre_callback);
+                        }
+                        if (!JS_IsUndefined(hook->post_callback))
+                        {
+                            JS_FreeValue(hook->ctx, hook->post_callback);
+                        }
+                    }
+                }
+            }
+            m_ufunction_hooks.clear();
+        }
+
+        // Clean up legacy hook callbacks
         {
             std::lock_guard<std::mutex> lock(m_hooks_mutex);
             for (auto& hook : m_hook_callbacks)
@@ -374,7 +412,11 @@ namespace RC::JSScript
         JS_SetPropertyStr(ctx, global, "StaticFindObject",
             JS_NewCFunction(ctx, js_static_find_object, "StaticFindObject", 1));
         JS_SetPropertyStr(ctx, global, "RegisterHook",
-            JS_NewCFunction(ctx, js_register_hook, "RegisterHook", 2));
+            JS_NewCFunction(ctx, js_register_hook, "RegisterHook", 3));
+        JS_SetPropertyStr(ctx, global, "HookUFunction",
+            JS_NewCFunction(ctx, js_hook_ufunction, "HookUFunction", 3));
+        JS_SetPropertyStr(ctx, global, "UnregisterHook",
+            JS_NewCFunction(ctx, js_unregister_hook, "UnregisterHook", 2));
         JS_SetPropertyStr(ctx, global, "NotifyOnNewObject",
             JS_NewCFunction(ctx, js_notify_on_new_object, "NotifyOnNewObject", 2));
         
@@ -698,21 +740,42 @@ namespace RC::JSScript
     {
         if (argc < 2)
         {
-            return JS_ThrowTypeError(ctx, "RegisterHook requires at least 2 arguments: function_name, callback");
+            return JS_ThrowTypeError(ctx, "RegisterHook requires at least 2 arguments: function_name, pre_callback [, post_callback]");
         }
 
-        // Get function name
+        // Get function name/path
         const char* func_name = JS_ToCString(ctx, argv[0]);
         if (!func_name)
         {
             return JS_ThrowTypeError(ctx, "Invalid function name");
         }
 
-        // Check callback is a function
-        if (!JS_IsFunction(ctx, argv[1]))
+        // Check pre_callback is a function (or null/undefined for no pre-hook)
+        JSValue pre_callback = JS_UNDEFINED;
+        JSValue post_callback = JS_UNDEFINED;
+
+        if (JS_IsFunction(ctx, argv[1]))
+        {
+            pre_callback = argv[1];
+        }
+        else if (!JS_IsNull(argv[1]) && !JS_IsUndefined(argv[1]))
         {
             JS_FreeCString(ctx, func_name);
-            return JS_ThrowTypeError(ctx, "Second argument must be a callback function");
+            return JS_ThrowTypeError(ctx, "Second argument must be a callback function or null");
+        }
+
+        // Check optional post_callback
+        if (argc >= 3)
+        {
+            if (JS_IsFunction(ctx, argv[2]))
+            {
+                post_callback = argv[2];
+            }
+            else if (!JS_IsNull(argv[2]) && !JS_IsUndefined(argv[2]))
+            {
+                JS_FreeCString(ctx, func_name);
+                return JS_ThrowTypeError(ctx, "Third argument must be a callback function or null");
+            }
         }
 
         std::wstring wide_func_name(func_name, func_name + strlen(func_name));
@@ -730,32 +793,23 @@ namespace RC::JSScript
                 return JS_ThrowReferenceError(ctx, "UFunction not found");
             }
 
-            // Store the callback reference
+            // Get JSMod instance
             JSMod* mod = get_js_mod(ctx);
             if (!mod)
             {
                 return JS_ThrowInternalError(ctx, "Could not get JSMod instance");
             }
 
-            // Duplicate the callback to prevent GC
-            JSValue callback = JS_DupValue(ctx, argv[1]);
+            // Register the hook with UE4SS hook system
+            auto [pre_id, post_id] = mod->register_ufunction_hook(ctx, unreal_function, pre_callback, post_callback);
 
-            // Store hook callback data
-            {
-                std::lock_guard<std::mutex> lock(mod->m_hooks_mutex);
-                mod->m_hook_callbacks.push_back({ctx, callback, 0});
-            }
-
-            Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] RegisterHook: Registered hook for {}\n"), wide_func_name);
-            
-            // Note: Full UFunction hook integration requires more work with UE4SS's hook system
-            // This is a simplified implementation that stores the callback
-            // Full integration would use unreal_function->RegisterPreHook/RegisterPostHook
+            Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] RegisterHook: Successfully registered hook for {} (pre_id={}, post_id={})\n"), 
+                wide_func_name, pre_id, post_id);
 
             // Return hook IDs (pre and post)
             JSValue result = JS_NewArray(ctx);
-            JS_SetPropertyUint32(ctx, result, 0, JS_NewInt32(ctx, 0)); // pre_id
-            JS_SetPropertyUint32(ctx, result, 1, JS_NewInt32(ctx, 0)); // post_id
+            JS_SetPropertyUint32(ctx, result, 0, JS_NewInt32(ctx, pre_id));
+            JS_SetPropertyUint32(ctx, result, 1, JS_NewInt32(ctx, post_id));
             return result;
         }
         catch (const std::exception& e)
@@ -801,6 +855,154 @@ namespace RC::JSScript
         // This is a placeholder that acknowledges the registration
 
         return JS_UNDEFINED;
+    }
+
+    // HookUFunction - Direct equivalent of C# Hooking.HookUFunction
+    // Usage: HookUFunction(ufunction_object, pre_callback, post_callback)
+    // ufunction_object can be obtained via StaticFindObject
+    static JSValue js_hook_ufunction(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
+    {
+        if (argc < 2)
+        {
+            return JS_ThrowTypeError(ctx, "HookUFunction requires at least 2 arguments: ufunction, pre_callback [, post_callback]");
+        }
+
+        // Get UFunction from first argument (should be a UObject wrapper)
+        Unreal::UFunction* function = nullptr;
+        
+        // Check if it's a UObject wrapper
+        Unreal::UObject* obj = JSUObject::get_native(ctx, argv[0]);
+        if (obj)
+        {
+            // Cast to UFunction
+            function = static_cast<Unreal::UFunction*>(obj);
+        }
+        else
+        {
+            return JS_ThrowTypeError(ctx, "First argument must be a UFunction object");
+        }
+
+        if (!function)
+        {
+            return JS_ThrowTypeError(ctx, "Invalid UFunction object");
+        }
+
+        // Check pre_callback
+        JSValue pre_callback = JS_UNDEFINED;
+        JSValue post_callback = JS_UNDEFINED;
+
+        if (JS_IsFunction(ctx, argv[1]))
+        {
+            pre_callback = argv[1];
+        }
+        else if (!JS_IsNull(argv[1]) && !JS_IsUndefined(argv[1]))
+        {
+            return JS_ThrowTypeError(ctx, "Second argument must be a callback function or null");
+        }
+
+        // Check optional post_callback
+        if (argc >= 3)
+        {
+            if (JS_IsFunction(ctx, argv[2]))
+            {
+                post_callback = argv[2];
+            }
+            else if (!JS_IsNull(argv[2]) && !JS_IsUndefined(argv[2]))
+            {
+                return JS_ThrowTypeError(ctx, "Third argument must be a callback function or null");
+            }
+        }
+
+        try
+        {
+            // Get JSMod instance
+            JSMod* mod = get_js_mod(ctx);
+            if (!mod)
+            {
+                return JS_ThrowInternalError(ctx, "Could not get JSMod instance");
+            }
+
+            // Register the hook
+            auto [pre_id, post_id] = mod->register_ufunction_hook(ctx, function, pre_callback, post_callback);
+
+            Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] HookUFunction: Successfully hooked {} (pre_id={}, post_id={})\n"), 
+                function->GetFullName(), pre_id, post_id);
+
+            // Return hook IDs as array [pre_id, post_id]
+            JSValue result = JS_NewArray(ctx);
+            JS_SetPropertyUint32(ctx, result, 0, JS_NewInt32(ctx, pre_id));
+            JS_SetPropertyUint32(ctx, result, 1, JS_NewInt32(ctx, post_id));
+            return result;
+        }
+        catch (const std::exception& e)
+        {
+            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] HookUFunction exception: {}\n"), 
+                std::wstring(e.what(), e.what() + strlen(e.what())));
+            return JS_ThrowInternalError(ctx, "HookUFunction failed due to exception");
+        }
+        catch (...)
+        {
+            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] HookUFunction unknown exception\n"));
+            return JS_ThrowInternalError(ctx, "HookUFunction failed due to unknown exception");
+        }
+    }
+
+    // UnregisterHook - Unregister a previously registered hook
+    // Usage: UnregisterHook(pre_id, post_id)
+    static JSValue js_unregister_hook(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
+    {
+        if (argc < 2)
+        {
+            return JS_ThrowTypeError(ctx, "UnregisterHook requires 2 arguments: pre_id, post_id");
+        }
+
+        int32_t pre_id = 0;
+        int32_t post_id = 0;
+
+        if (JS_ToInt32(ctx, &pre_id, argv[0]) != 0)
+        {
+            return JS_ThrowTypeError(ctx, "First argument must be a number (pre_id)");
+        }
+
+        if (JS_ToInt32(ctx, &post_id, argv[1]) != 0)
+        {
+            return JS_ThrowTypeError(ctx, "Second argument must be a number (post_id)");
+        }
+
+        try
+        {
+            JSMod* mod = get_js_mod(ctx);
+            if (!mod)
+            {
+                return JS_ThrowInternalError(ctx, "Could not get JSMod instance");
+            }
+
+            bool success = mod->unregister_ufunction_hook(pre_id, post_id);
+            
+            if (success)
+            {
+                Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] UnregisterHook: Successfully unregistered hook (pre_id={}, post_id={})\n"), 
+                    pre_id, post_id);
+            }
+            else
+            {
+                Output::send<LogLevel::Warning>(STR("[UE4SSL.JavaScript] UnregisterHook: Hook not found (pre_id={}, post_id={})\n"), 
+                    pre_id, post_id);
+            }
+
+            return JS_NewBool(ctx, success);
+        }
+        catch (const std::exception& e)
+        {
+            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] UnregisterHook exception: {}\n"), 
+                std::wstring(e.what(), e.what() + strlen(e.what())));
+            return JS_ThrowInternalError(ctx, "UnregisterHook failed due to exception");
+        }
+        catch (...)
+        {
+            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] UnregisterHook unknown exception\n"));
+            return JS_ThrowInternalError(ctx, "UnregisterHook failed due to unknown exception");
+        }
     }
 
     // ============================================
@@ -899,6 +1101,308 @@ namespace RC::JSScript
     {
         // Same implementation as clearTimeout
         return js_clear_timeout(ctx, this_val, argc, argv);
+    }
+
+    // ============================================
+    // UFunction Hook Implementation
+    // ============================================
+
+    auto JSMod::register_ufunction_hook(JSContext* ctx, Unreal::UFunction* function, 
+                                        JSValue pre_callback, JSValue post_callback) -> std::pair<int32_t, int32_t>
+    {
+        if (!function)
+        {
+            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] register_ufunction_hook: function is null\n"));
+            return {0, 0};
+        }
+
+        // Create hook data
+        auto hook_data = std::make_unique<JSUFunctionHookData>();
+        hook_data->owner = this;
+        hook_data->ctx = ctx;
+        hook_data->function = function;
+        hook_data->has_return_value = false;
+        hook_data->pre_id = 0;
+        hook_data->post_id = 0;
+
+        // Duplicate JS values to prevent GC
+        if (JS_IsFunction(ctx, pre_callback))
+        {
+            hook_data->pre_callback = JS_DupValue(ctx, pre_callback);
+        }
+        else
+        {
+            hook_data->pre_callback = JS_UNDEFINED;
+        }
+
+        if (JS_IsFunction(ctx, post_callback))
+        {
+            hook_data->post_callback = JS_DupValue(ctx, post_callback);
+        }
+        else
+        {
+            hook_data->post_callback = JS_UNDEFINED;
+        }
+
+        // Get raw pointer before moving into vector
+        JSUFunctionHookData* raw_hook_data = hook_data.get();
+
+        // Store in our list
+        {
+            std::lock_guard<std::mutex> lock(m_ufunction_hooks_mutex);
+            m_ufunction_hooks.push_back(std::move(hook_data));
+        }
+
+        // Register hooks with UE4SS hook system
+        Unreal::CallbackId pre_id = 0;
+        Unreal::CallbackId post_id = 0;
+
+        if (!JS_IsUndefined(raw_hook_data->pre_callback))
+        {
+            pre_id = function->RegisterPreHook(js_ufunction_hook_pre, raw_hook_data);
+            raw_hook_data->pre_id = pre_id;
+            Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Registered pre-hook (id={}) for {}\n"), 
+                pre_id, function->GetFullName());
+        }
+
+        if (!JS_IsUndefined(raw_hook_data->post_callback))
+        {
+            post_id = function->RegisterPostHook(js_ufunction_hook_post, raw_hook_data);
+            raw_hook_data->post_id = post_id;
+            Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Registered post-hook (id={}) for {}\n"), 
+                post_id, function->GetFullName());
+        }
+
+        return {pre_id, post_id};
+    }
+
+    auto JSMod::unregister_ufunction_hook(Unreal::CallbackId pre_id, Unreal::CallbackId post_id) -> bool
+    {
+        std::lock_guard<std::mutex> lock(m_ufunction_hooks_mutex);
+
+        for (auto it = m_ufunction_hooks.begin(); it != m_ufunction_hooks.end(); ++it)
+        {
+            auto& hook = *it;
+            if (hook && (hook->pre_id == pre_id || hook->post_id == post_id))
+            {
+                if (hook->function)
+                {
+                    if (hook->pre_id != 0)
+                    {
+                        hook->function->UnregisterHook(hook->pre_id);
+                    }
+                    if (hook->post_id != 0)
+                    {
+                        hook->function->UnregisterHook(hook->post_id);
+                    }
+                }
+                if (hook->ctx)
+                {
+                    if (!JS_IsUndefined(hook->pre_callback))
+                    {
+                        JS_FreeValue(hook->ctx, hook->pre_callback);
+                    }
+                    if (!JS_IsUndefined(hook->post_callback))
+                    {
+                        JS_FreeValue(hook->ctx, hook->post_callback);
+                    }
+                }
+                m_ufunction_hooks.erase(it);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void JSMod::js_ufunction_hook_pre(Unreal::UnrealScriptFunctionCallableContext& context, void* custom_data)
+    {
+        auto* hook_data = static_cast<JSUFunctionHookData*>(custom_data);
+        if (!hook_data || !hook_data->ctx || JS_IsUndefined(hook_data->pre_callback))
+        {
+            return;
+        }
+
+        JSContext* ctx = hook_data->ctx;
+
+        // Get function parameters
+        uint16_t return_value_offset = context.TheStack.CurrentNativeFunction()->GetReturnValueOffset();
+        hook_data->has_return_value = return_value_offset != 0xFFFF;
+
+        uint8_t num_unreal_params = context.TheStack.CurrentNativeFunction()->GetNumParms();
+        if (hook_data->has_return_value)
+        {
+            --num_unreal_params;
+        }
+
+        // Build parameters array
+        std::vector<void*> params;
+        bool has_properties_to_process = hook_data->has_return_value || num_unreal_params > 0;
+        if (has_properties_to_process && (context.TheStack.Locals() || context.TheStack.OutParms()))
+        {
+            for (Unreal::FProperty* func_prop : context.TheStack.CurrentNativeFunction()->ForEachProperty())
+            {
+                if (!func_prop->HasAnyPropertyFlags(Unreal::EPropertyFlags::CPF_Parm))
+                {
+                    continue;
+                }
+                if (func_prop->HasAnyPropertyFlags(Unreal::EPropertyFlags::CPF_ReturnParm))
+                {
+                    continue;
+                }
+
+                void* param_data = nullptr;
+                if (func_prop->HasAnyPropertyFlags(Unreal::EPropertyFlags::CPF_OutParm) && !func_prop->HasAnyPropertyFlags(Unreal::EPropertyFlags::CPF_ConstParm))
+                {
+                    param_data = context.TheStack.OutParms();
+                    for (auto out_param = context.TheStack.OutParms(); out_param; out_param = out_param->NextOutParm)
+                    {
+                        if (out_param->Property == func_prop)
+                        {
+                            param_data = out_param->PropAddr;
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    param_data = func_prop->ContainerPtrToValuePtr<void>(context.TheStack.Locals());
+                }
+
+                params.push_back(param_data);
+            }
+        }
+
+        // Create JS arguments: (context_uobject, params_array, return_value_ptr)
+        JSValue args[3];
+        args[0] = JSUObject::create(ctx, context.Context);  // 'this' UObject
+
+        // Create params array for JS
+        JSValue js_params = JS_NewArray(ctx);
+        for (size_t i = 0; i < params.size(); i++)
+        {
+            // For now, pass raw pointers as BigInt (can be extended to convert to proper JS types)
+            JS_SetPropertyUint32(ctx, js_params, static_cast<uint32_t>(i), 
+                JS_NewBigInt64(ctx, reinterpret_cast<int64_t>(params[i])));
+        }
+        args[1] = js_params;
+
+        // Return value pointer
+        args[2] = JS_NewBigInt64(ctx, reinterpret_cast<int64_t>(context.RESULT_DECL));
+
+        // Call the JS callback
+        JSValue result = JS_Call(ctx, hook_data->pre_callback, JS_UNDEFINED, 3, args);
+        if (JS_IsException(result))
+        {
+            // Log exception
+            JSValue exception = JS_GetException(ctx);
+            const char* str = JS_ToCString(ctx, exception);
+            if (str)
+            {
+                Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] Pre-hook exception: {}\n"), 
+                    std::wstring(str, str + strlen(str)));
+                JS_FreeCString(ctx, str);
+            }
+            JS_FreeValue(ctx, exception);
+        }
+
+        // Cleanup
+        JS_FreeValue(ctx, result);
+        JS_FreeValue(ctx, args[0]);
+        JS_FreeValue(ctx, args[1]);
+        JS_FreeValue(ctx, args[2]);
+    }
+
+    void JSMod::js_ufunction_hook_post(Unreal::UnrealScriptFunctionCallableContext& context, void* custom_data)
+    {
+        auto* hook_data = static_cast<JSUFunctionHookData*>(custom_data);
+        if (!hook_data || !hook_data->ctx || JS_IsUndefined(hook_data->post_callback))
+        {
+            return;
+        }
+
+        JSContext* ctx = hook_data->ctx;
+
+        uint8_t num_unreal_params = context.TheStack.CurrentNativeFunction()->GetNumParms();
+        if (hook_data->has_return_value)
+        {
+            --num_unreal_params;
+        }
+
+        // Build parameters array (same as pre-hook)
+        std::vector<void*> params;
+        bool has_properties_to_process = hook_data->has_return_value || num_unreal_params > 0;
+        if (has_properties_to_process && (context.TheStack.Locals() || context.TheStack.OutParms()))
+        {
+            for (Unreal::FProperty* func_prop : context.TheStack.CurrentNativeFunction()->ForEachProperty())
+            {
+                if (!func_prop->HasAnyPropertyFlags(Unreal::EPropertyFlags::CPF_Parm))
+                {
+                    continue;
+                }
+                if (func_prop->HasAnyPropertyFlags(Unreal::EPropertyFlags::CPF_ReturnParm))
+                {
+                    continue;
+                }
+
+                void* param_data = nullptr;
+                if (func_prop->HasAnyPropertyFlags(Unreal::EPropertyFlags::CPF_OutParm) && !func_prop->HasAnyPropertyFlags(Unreal::EPropertyFlags::CPF_ConstParm))
+                {
+                    param_data = context.TheStack.OutParms();
+                    for (auto out_param = context.TheStack.OutParms(); out_param; out_param = out_param->NextOutParm)
+                    {
+                        if (out_param->Property == func_prop)
+                        {
+                            param_data = out_param->PropAddr;
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    param_data = func_prop->ContainerPtrToValuePtr<void>(context.TheStack.Locals());
+                }
+
+                params.push_back(param_data);
+            }
+        }
+
+        // Create JS arguments: (context_uobject, params_array, return_value_ptr)
+        JSValue args[3];
+        args[0] = JSUObject::create(ctx, context.Context);  // 'this' UObject
+
+        // Create params array for JS
+        JSValue js_params = JS_NewArray(ctx);
+        for (size_t i = 0; i < params.size(); i++)
+        {
+            JS_SetPropertyUint32(ctx, js_params, static_cast<uint32_t>(i), 
+                JS_NewBigInt64(ctx, reinterpret_cast<int64_t>(params[i])));
+        }
+        args[1] = js_params;
+
+        // Return value pointer
+        args[2] = JS_NewBigInt64(ctx, reinterpret_cast<int64_t>(context.RESULT_DECL));
+
+        // Call the JS callback
+        JSValue result = JS_Call(ctx, hook_data->post_callback, JS_UNDEFINED, 3, args);
+        if (JS_IsException(result))
+        {
+            // Log exception
+            JSValue exception = JS_GetException(ctx);
+            const char* str = JS_ToCString(ctx, exception);
+            if (str)
+            {
+                Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] Post-hook exception: {}\n"), 
+                    std::wstring(str, str + strlen(str)));
+                JS_FreeCString(ctx, str);
+            }
+            JS_FreeValue(ctx, exception);
+        }
+
+        // Cleanup
+        JS_FreeValue(ctx, result);
+        JS_FreeValue(ctx, args[0]);
+        JS_FreeValue(ctx, args[1]);
+        JS_FreeValue(ctx, args[2]);
     }
 
     // ============================================

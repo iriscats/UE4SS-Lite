@@ -64,13 +64,74 @@ Find an object by its full path.
 const obj = StaticFindObject("/Script/Engine.Default__GameEngine");
 ```
 
-#### `RegisterHook(functionName, callback)`
-Register a hook for a UFunction.
+#### `RegisterHook(functionPath, preCallback, postCallback)`
+Register a hook for a UFunction by its path. This is similar to C#'s `Hooking.HookUFunction`.
+
+**Parameters:**
+- `functionPath` - Full path to the UFunction (e.g., "/Game/MyMod.MyClass_C:MyFunction")
+- `preCallback` - Function called before the original function (or `null` to skip)
+- `postCallback` - (optional) Function called after the original function (or `null` to skip)
+
+**Callback Parameters:**
+- `thisObject` - The UObject that the function is being called on
+- `params` - Array of raw pointers to function parameters (as BigInt)
+- `returnValue` - Raw pointer to return value location (as BigInt)
+
+**Returns:** Array `[preHookId, postHookId]`
 
 ```javascript
-RegisterHook("/Script/Engine.PlayerController:ClientRestart", (context) => {
-    print("ClientRestart called!");
-});
+// Example: Hook a Blueprint function
+var hookIds = RegisterHook(
+    "/Game/ModIntegration/MI_SpawnMods.MI_SpawnMods_C:OnInitCave",
+    function(thisObj, params, ret) {
+        print("OnInitCave Pre-hook: function is about to execute");
+    },
+    function(thisObj, params, ret) {
+        print("OnInitCave Post-hook: function finished executing");
+    }
+);
+
+print("Hook registered with IDs:", hookIds[0], hookIds[1]);
+```
+
+#### `HookUFunction(ufunctionObject, preCallback, postCallback)`
+Register a hook for a UFunction object directly. Use this when you already have a UFunction reference.
+
+**Parameters:**
+- `ufunctionObject` - A UFunction object (obtained via `StaticFindObject`)
+- `preCallback` - Function called before the original function (or `null` to skip)
+- `postCallback` - (optional) Function called after the original function (or `null` to skip)
+
+**Returns:** Array `[preHookId, postHookId]`
+
+```javascript
+// Find the UFunction first, then hook it
+var func = StaticFindObject("/Game/MyMod.MyClass_C:MyFunction");
+if (func) {
+    var hookIds = HookUFunction(func, 
+        function(thisObj, params, ret) {
+            print("Pre-hook fired!");
+        },
+        function(thisObj, params, ret) {
+            print("Post-hook fired!");
+        }
+    );
+}
+```
+
+#### `UnregisterHook(preId, postId)`
+Unregister a previously registered hook.
+
+**Parameters:**
+- `preId` - The pre-hook ID returned from RegisterHook/HookUFunction
+- `postId` - The post-hook ID returned from RegisterHook/HookUFunction
+
+**Returns:** Boolean indicating success
+
+```javascript
+// Later, unregister the hook
+var success = UnregisterHook(hookIds[0], hookIds[1]);
+print("Hook unregistered:", success);
 ```
 
 #### `NotifyOnNewObject(className, callback)`
@@ -132,9 +193,9 @@ The QuickJS source is included in `deps/quickjs/`.
 
 ## Limitations
 
-- Hook system is simplified compared to Lua (full integration WIP)
 - Not all UE4 types are bound yet
 - Property access on UObjects is limited
+- Hook callback parameters are passed as raw pointers (BigInt) - type-safe param access coming soon
 
 ## License
 

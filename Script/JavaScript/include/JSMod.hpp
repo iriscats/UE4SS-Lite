@@ -7,14 +7,26 @@
 #include <functional>
 #include <mutex>
 #include <thread>
+#include <memory>
 
 // QuickJS headers
 extern "C" {
 #include "quickjs.h"
 }
 
+// Forward declarations for Unreal types
+namespace RC::Unreal
+{
+    class UFunction;
+    class UObject;
+    class UnrealScriptFunctionCallableContext;
+    using CallbackId = int32_t;
+}
+
 namespace RC::JSScript
 {
+    class JSMod;  // Forward declaration
+
     /**
      * JSMod - JavaScript scripting engine manager based on QuickJS
      * 
@@ -24,7 +36,20 @@ namespace RC::JSScript
     class JSMod
     {
     public:
-        // Callback data for hooks
+        // JavaScript UFunction Hook data
+        struct JSUFunctionHookData
+        {
+            JSMod* owner;                      // Pointer to JSMod instance
+            JSContext* ctx;                    // JS context
+            JSValue pre_callback;              // JS pre-hook callback function
+            JSValue post_callback;             // JS post-hook callback function
+            Unreal::UFunction* function;       // The hooked UFunction
+            Unreal::CallbackId pre_id;         // Pre-hook callback ID
+            Unreal::CallbackId post_id;        // Post-hook callback ID
+            bool has_return_value;             // Does the function have a return value
+        };
+
+        // Legacy callback data for hooks (kept for compatibility)
         struct HookCallback
         {
             JSContext* ctx;
@@ -45,7 +70,11 @@ namespace RC::JSScript
         };
 
     public:
-        // Hook management (public for access from global functions)
+        // UFunction hook management (public for access from global functions)
+        std::vector<std::unique_ptr<JSUFunctionHookData>> m_ufunction_hooks;
+        std::mutex m_ufunction_hooks_mutex;
+
+        // Legacy hook management (public for access from global functions)
         std::vector<HookCallback> m_hook_callbacks;
         std::mutex m_hooks_mutex;
         
@@ -84,6 +113,15 @@ namespace RC::JSScript
         auto add_timer(JSContext* ctx, JSValue callback, double delay_ms, bool is_interval) -> int32_t;
         auto cancel_timer(int32_t id) -> bool;
         auto process_timers() -> void;
+        
+        // UFunction hook management
+        auto register_ufunction_hook(JSContext* ctx, Unreal::UFunction* function, 
+                                     JSValue pre_callback, JSValue post_callback) -> std::pair<int32_t, int32_t>;
+        auto unregister_ufunction_hook(Unreal::CallbackId pre_id, Unreal::CallbackId post_id) -> bool;
+
+        // Static hook callbacks for UE4SS hook system
+        static void js_ufunction_hook_pre(Unreal::UnrealScriptFunctionCallableContext& context, void* custom_data);
+        static void js_ufunction_hook_post(Unreal::UnrealScriptFunctionCallableContext& context, void* custom_data);
         
         // Getters
         [[nodiscard]] auto get_runtime() const -> JSRuntime* { return m_runtime; }

@@ -825,11 +825,13 @@ namespace RC
             set_error("Mods directory doesn't exist, please create it: <%S>", m_mods_directory.c_str());
         }
 
-        // Setup UE4SSL.CSharp.dll
-        m_mods.emplace_back(std::make_unique<CppMod>(*this, STR("UE4SSL.CSharp"), ensure_str(m_working_directory), STR("UE4SSL.CSharp.dll")));
+        // Setup UE4SSL.CSharp.dll (only if file exists)
+        if (std::filesystem::exists(m_working_directory / STR("UE4SSL.CSharp.dll")))
+            m_mods.emplace_back(std::make_unique<CppMod>(*this, STR("UE4SSL.CSharp"), ensure_str(m_working_directory), STR("UE4SSL.CSharp.dll")));
 
-        // Setup UE4SSL.JavaScript.dll
-        m_mods.emplace_back(std::make_unique<CppMod>(*this, STR("UE4SSL.JavaScript"), ensure_str(m_working_directory), STR("UE4SSL.JavaScript.dll")));
+        // Setup UE4SSL.JavaScript.dll (only if file exists)
+        if (std::filesystem::exists(m_working_directory / STR("UE4SSL.JavaScript.dll")))
+            m_mods.emplace_back(std::make_unique<CppMod>(*this, STR("UE4SSL.JavaScript"), ensure_str(m_working_directory), STR("UE4SSL.JavaScript.dll")));
 
         for (const auto& sub_directory : std::filesystem::directory_iterator(m_mods_directory))
         {
@@ -960,29 +962,34 @@ namespace RC
     {
         std::filesystem::path mods_directory = UE4SSProgram::get_program().get_mods_directory();
     
+        // Start UE4SSL.CSharp mod (only if mod exists and is installable)
         auto cs_mod = UE4SSProgram::find_mod_by_name<ModType>(STR("UE4SSL.CSharp"), UE4SSProgram::IsInstalled::Yes);
-        if (!dynamic_cast<ModType*>(cs_mod))
+        if (cs_mod)
         {
-            Output::send(STR("Mod dynamic_cast error: {} \n"), STR("UE4SSL.CSharp"));
+            if (!dynamic_cast<ModType*>(cs_mod))
+            {
+                Output::send(STR("Mod dynamic_cast error: {} \n"), STR("UE4SSL.CSharp"));
+            }
+            else if (!cs_mod->is_started())
+            {
+                cs_mod->start_mod();
+                Output::send(STR("Load Mod '{}' , starting mod.\n"), cs_mod->get_name().data());
+            }
         }
 
-        if (!cs_mod->is_started())
-        {
-            cs_mod->start_mod();
-            Output::send(STR("Load Mod '{}' , starting mod.\n"), cs_mod->get_name().data());
-        }
-
-        // Start UE4SSL.JavaScript mod
+        // Start UE4SSL.JavaScript mod (only if mod exists and is installable)
         auto js_mod = UE4SSProgram::find_mod_by_name<ModType>(STR("UE4SSL.JavaScript"), UE4SSProgram::IsInstalled::Yes);
-        if (!dynamic_cast<ModType*>(js_mod))
+        if (js_mod)
         {
-            Output::send(STR("Mod dynamic_cast error: {} \n"), STR("UE4SSL.JavaScript"));
-        }
-
-        if (js_mod && !js_mod->is_started())
-        {
-            js_mod->start_mod();
-            Output::send(STR("Load Mod '{}' , starting mod.\n"), js_mod->get_name().data());
+            if (!dynamic_cast<ModType*>(js_mod))
+            {
+                Output::send(STR("Mod dynamic_cast error: {} \n"), STR("UE4SSL.JavaScript"));
+            }
+            else if (!js_mod->is_started())
+            {
+                js_mod->start_mod();
+                Output::send(STR("Load Mod '{}' , starting mod.\n"), js_mod->get_name().data());
+            }
         }
 
         for (const auto& mod_directory : std::filesystem::directory_iterator(mods_directory))
