@@ -15,6 +15,13 @@
 #include <Unreal/UFunctionStructs.hpp>
 #include <Unreal/FFrame.hpp>
 #include <Unreal/UnrealFlags.hpp>
+#include <Unreal/FString.hpp>
+#include <Unreal/Property/FStrProperty.hpp>
+#include <Unreal/Property/FBoolProperty.hpp>
+#include <Unreal/Property/FNumericProperty.hpp>
+#include <Unreal/Property/FObjectProperty.hpp>
+#include <Unreal/Property/FNameProperty.hpp>
+#include <Input/Handler.hpp>
 
 // QuickJS headers
 extern "C" {
@@ -33,6 +40,8 @@ namespace RC::JSScript
     static JSValue js_hook_ufunction(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
     static JSValue js_unregister_hook(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
     static JSValue js_notify_on_new_object(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
+    static JSValue js_register_key_bind(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
+    static JSValue js_call_function(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
     
     // Timer functions
     static JSValue js_set_timeout(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
@@ -204,6 +213,19 @@ namespace RC::JSScript
             m_timers.clear();
         }
 
+        // Clean up key bindings
+        {
+            std::lock_guard<std::mutex> lock(m_key_bindings_mutex);
+            for (auto& key_bind : m_key_bindings)
+            {
+                if (key_bind && key_bind->ctx)
+                {
+                    JS_FreeValue(key_bind->ctx, key_bind->callback);
+                }
+            }
+            m_key_bindings.clear();
+        }
+
         // Free context
         if (m_main_ctx)
         {
@@ -360,6 +382,9 @@ namespace RC::JSScript
         // Set memory limit (100MB)
         JS_SetMemoryLimit(m_runtime, 100 * 1024 * 1024);
 
+        // Set max stack size (8MB) - prevents "Maximum call stack size exceeded" errors
+        JS_SetMaxStackSize(m_runtime, 8 * 1024 * 1024);
+
         // Set GC threshold
         JS_SetGCThreshold(m_runtime, 1024 * 1024);
 
@@ -419,6 +444,10 @@ namespace RC::JSScript
             JS_NewCFunction(ctx, js_unregister_hook, "UnregisterHook", 2));
         JS_SetPropertyStr(ctx, global, "NotifyOnNewObject",
             JS_NewCFunction(ctx, js_notify_on_new_object, "NotifyOnNewObject", 2));
+        JS_SetPropertyStr(ctx, global, "RegisterKeyBind",
+            JS_NewCFunction(ctx, js_register_key_bind, "RegisterKeyBind", 3));
+        JS_SetPropertyStr(ctx, global, "CallFunction",
+            JS_NewCFunction(ctx, js_call_function, "CallFunction", 3));
         
         // Register timer functions
         JS_SetPropertyStr(ctx, global, "setTimeout",
@@ -871,11 +900,11 @@ namespace RC::JSScript
         Unreal::UFunction* function = nullptr;
         
         // Check if it's a UObject wrapper
-        Unreal::UObject* obj = JSUObject::get_native(ctx, argv[0]);
+        void* obj = JSUObject::get_uobject(ctx, argv[0]);
         if (obj)
         {
             // Cast to UFunction
-            function = static_cast<Unreal::UFunction*>(obj);
+            function = static_cast<Unreal::UFunction*>(static_cast<Unreal::UObject*>(obj));
         }
         else
         {
@@ -1002,6 +1031,298 @@ namespace RC::JSScript
         {
             Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] UnregisterHook unknown exception\n"));
             return JS_ThrowInternalError(ctx, "UnregisterHook failed due to unknown exception");
+        }
+    }
+
+    // ============================================
+    // Key Binding Functions Implementation
+    // ============================================
+
+    // Helper to convert key name string to Input::Key enum
+    static Input::Key string_to_key(const char* key_name)
+    {
+        // Letters A-Z
+        if (strlen(key_name) == 1 && key_name[0] >= 'A' && key_name[0] <= 'Z')
+        {
+            return static_cast<Input::Key>(key_name[0]);
+        }
+        if (strlen(key_name) == 1 && key_name[0] >= 'a' && key_name[0] <= 'z')
+        {
+            return static_cast<Input::Key>(key_name[0] - 32);  // Convert to uppercase
+        }
+        
+        // Numbers 0-9
+        if (strlen(key_name) == 1 && key_name[0] >= '0' && key_name[0] <= '9')
+        {
+            return static_cast<Input::Key>(key_name[0]);
+        }
+        
+        // Function keys F1-F12
+        if (key_name[0] == 'F' || key_name[0] == 'f')
+        {
+            int num = atoi(key_name + 1);
+            if (num >= 1 && num <= 12)
+            {
+                return static_cast<Input::Key>(Input::Key::F1 + num - 1);
+            }
+        }
+        
+        // Special keys
+        if (_stricmp(key_name, "ESCAPE") == 0 || _stricmp(key_name, "ESC") == 0) return Input::Key::ESCAPE;
+        if (_stricmp(key_name, "SPACE") == 0) return Input::Key::SPACE;
+        if (_stricmp(key_name, "ENTER") == 0 || _stricmp(key_name, "RETURN") == 0) return Input::Key::RETURN;
+        if (_stricmp(key_name, "TAB") == 0) return Input::Key::TAB;
+        if (_stricmp(key_name, "BACKSPACE") == 0) return Input::Key::BACKSPACE;
+        if (_stricmp(key_name, "DELETE") == 0 || _stricmp(key_name, "DEL") == 0) return Input::Key::DEL;
+        if (_stricmp(key_name, "INSERT") == 0 || _stricmp(key_name, "INS") == 0) return Input::Key::INS;
+        if (_stricmp(key_name, "HOME") == 0) return Input::Key::HOME;
+        if (_stricmp(key_name, "END") == 0) return Input::Key::END;
+        if (_stricmp(key_name, "PAGEUP") == 0) return Input::Key::PAGE_UP;
+        if (_stricmp(key_name, "PAGEDOWN") == 0) return Input::Key::PAGE_DOWN;
+        if (_stricmp(key_name, "UP") == 0) return Input::Key::UP_ARROW;
+        if (_stricmp(key_name, "DOWN") == 0) return Input::Key::DOWN_ARROW;
+        if (_stricmp(key_name, "LEFT") == 0) return Input::Key::LEFT_ARROW;
+        if (_stricmp(key_name, "RIGHT") == 0) return Input::Key::RIGHT_ARROW;
+        if (_stricmp(key_name, "NUMLOCK") == 0) return Input::Key::NUM_LOCK;
+        if (_stricmp(key_name, "CAPSLOCK") == 0) return Input::Key::CAPS_LOCK;
+        if (_stricmp(key_name, "SCROLLLOCK") == 0) return Input::Key::SCROLL_LOCK;
+        if (_stricmp(key_name, "PAUSE") == 0) return Input::Key::PAUSE;
+        if (_stricmp(key_name, "PRINTSCREEN") == 0) return Input::Key::PRINT_SCREEN;
+        
+        // Numpad
+        if (_strnicmp(key_name, "NUM", 3) == 0 && strlen(key_name) == 4)
+        {
+            char c = key_name[3];
+            if (c >= '0' && c <= '9')
+            {
+                return static_cast<Input::Key>(Input::Key::NUM_ZERO + (c - '0'));
+            }
+        }
+        
+        // Default: return 0 (invalid)
+        return static_cast<Input::Key>(0);
+    }
+
+    // RegisterKeyBind(key, callback, [modifiers])
+    // key: string like "F1", "A", "SPACE", etc.
+    // callback: function to call when key is pressed
+    // modifiers: optional object { ctrl: bool, shift: bool, alt: bool }
+    static JSValue js_register_key_bind(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
+    {
+        if (argc < 2)
+        {
+            return JS_ThrowTypeError(ctx, "RegisterKeyBind requires at least 2 arguments: key, callback [, modifiers]");
+        }
+
+        // Get key name
+        const char* key_name = JS_ToCString(ctx, argv[0]);
+        if (!key_name)
+        {
+            return JS_ThrowTypeError(ctx, "First argument must be a key name string");
+        }
+
+        // Convert key name to key code
+        Input::Key key = string_to_key(key_name);
+        JS_FreeCString(ctx, key_name);
+
+        if (key == 0)
+        {
+            return JS_ThrowTypeError(ctx, "Invalid key name");
+        }
+
+        // Check callback is a function
+        if (!JS_IsFunction(ctx, argv[1]))
+        {
+            return JS_ThrowTypeError(ctx, "Second argument must be a callback function");
+        }
+
+        // Parse modifiers
+        bool with_ctrl = false;
+        bool with_shift = false;
+        bool with_alt = false;
+
+        if (argc >= 3 && JS_IsObject(argv[2]))
+        {
+            JSValue ctrl_val = JS_GetPropertyStr(ctx, argv[2], "ctrl");
+            JSValue shift_val = JS_GetPropertyStr(ctx, argv[2], "shift");
+            JSValue alt_val = JS_GetPropertyStr(ctx, argv[2], "alt");
+
+            if (JS_IsBool(ctrl_val)) with_ctrl = JS_ToBool(ctx, ctrl_val);
+            if (JS_IsBool(shift_val)) with_shift = JS_ToBool(ctx, shift_val);
+            if (JS_IsBool(alt_val)) with_alt = JS_ToBool(ctx, alt_val);
+
+            JS_FreeValue(ctx, ctrl_val);
+            JS_FreeValue(ctx, shift_val);
+            JS_FreeValue(ctx, alt_val);
+        }
+
+        try
+        {
+            JSMod* mod = get_js_mod(ctx);
+            if (!mod)
+            {
+                return JS_ThrowInternalError(ctx, "Could not get JSMod instance");
+            }
+
+            bool success = mod->register_key_bind(ctx, static_cast<uint8_t>(key), argv[1], with_ctrl, with_shift, with_alt);
+            
+            return JS_NewBool(ctx, success);
+        }
+        catch (const std::exception& e)
+        {
+            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] RegisterKeyBind exception: {}\n"), 
+                std::wstring(e.what(), e.what() + strlen(e.what())));
+            return JS_ThrowInternalError(ctx, "RegisterKeyBind failed due to exception");
+        }
+        catch (...)
+        {
+            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] RegisterKeyBind unknown exception\n"));
+            return JS_ThrowInternalError(ctx, "RegisterKeyBind failed due to unknown exception");
+        }
+    }
+
+    // ============================================
+    // Function Call Implementation
+    // ============================================
+
+    // CallFunction(object, functionName, ...args) - Call a UFunction on an object
+    // For string parameters, pass JS strings directly
+    static JSValue js_call_function(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
+    {
+        if (argc < 2)
+        {
+            return JS_ThrowTypeError(ctx, "CallFunction requires at least 2 arguments: object, functionName [, ...args]");
+        }
+
+        // Get UObject from first argument
+        void* obj_ptr = JSUObject::get_uobject(ctx, argv[0]);
+        if (!obj_ptr)
+        {
+            return JS_ThrowTypeError(ctx, "First argument must be a UObject");
+        }
+        Unreal::UObject* object = static_cast<Unreal::UObject*>(obj_ptr);
+
+        // Get function name
+        const char* func_name = JS_ToCString(ctx, argv[1]);
+        if (!func_name)
+        {
+            return JS_ThrowTypeError(ctx, "Second argument must be a function name string");
+        }
+        std::wstring wide_func_name(func_name, func_name + strlen(func_name));
+        JS_FreeCString(ctx, func_name);
+
+        try
+        {
+            // Find the function on the object
+            Unreal::UFunction* function = object->GetFunctionByNameInChain(wide_func_name.c_str());
+            if (!function)
+            {
+                return JS_ThrowReferenceError(ctx, "Function not found on object");
+            }
+
+            // Get function parameter info
+            int32_t params_size = function->GetParmsSize();
+            
+            // Allocate parameters memory
+            void* params_memory = nullptr;
+            if (params_size > 0)
+            {
+                params_memory = calloc(1, params_size);
+                if (!params_memory)
+                {
+                    return JS_ThrowInternalError(ctx, "Failed to allocate params memory");
+                }
+            }
+
+            // Fill in parameters from JS arguments
+            int js_arg_index = 2;  // Start after object and function name
+            for (Unreal::FProperty* prop : function->ForEachProperty())
+            {
+                if (!prop->HasAnyPropertyFlags(Unreal::EPropertyFlags::CPF_Parm))
+                {
+                    continue;
+                }
+                if (prop->HasAnyPropertyFlags(Unreal::EPropertyFlags::CPF_ReturnParm))
+                {
+                    continue;
+                }
+
+                if (js_arg_index >= argc)
+                {
+                    break;  // No more JS arguments
+                }
+
+                void* prop_addr = prop->ContainerPtrToValuePtr<void>(params_memory);
+                
+                // Handle different property types
+                if (prop->IsA<Unreal::FStrProperty>())
+                {
+                    // String parameter
+                    const char* str_val = JS_ToCString(ctx, argv[js_arg_index]);
+                    if (str_val)
+                    {
+                        std::wstring wide_str(str_val, str_val + strlen(str_val));
+                        JS_FreeCString(ctx, str_val);
+                        
+                        // Construct FString in place
+                        new (prop_addr) Unreal::FString(wide_str.c_str());
+                    }
+                }
+                else if (prop->IsA<Unreal::FBoolProperty>())
+                {
+                    Unreal::FBoolProperty* bool_prop = static_cast<Unreal::FBoolProperty*>(prop);
+                    bool_prop->SetPropertyValue(prop_addr, JS_ToBool(ctx, argv[js_arg_index]));
+                }
+                else if (prop->IsA<Unreal::FNumericProperty>())
+                {
+                    Unreal::FNumericProperty* num_prop = static_cast<Unreal::FNumericProperty*>(prop);
+                    if (num_prop->IsFloatingPoint())
+                    {
+                        double val;
+                        JS_ToFloat64(ctx, &val, argv[js_arg_index]);
+                        num_prop->SetFloatingPointPropertyValue(prop_addr, val);
+                    }
+                    else if (num_prop->IsInteger())
+                    {
+                        int64_t val;
+                        JS_ToInt64(ctx, &val, argv[js_arg_index]);
+                        num_prop->SetIntPropertyValue(prop_addr, val);
+                    }
+                }
+                else if (prop->IsA<Unreal::FObjectProperty>())
+                {
+                    void* arg_obj = JSUObject::get_uobject(ctx, argv[js_arg_index]);
+                    if (arg_obj)
+                    {
+                        *static_cast<Unreal::UObject**>(prop_addr) = static_cast<Unreal::UObject*>(arg_obj);
+                    }
+                }
+
+                js_arg_index++;
+            }
+
+            // Call the function
+            object->ProcessEvent(function, params_memory);
+
+            // Clean up
+            if (params_memory)
+            {
+                free(params_memory);
+            }
+
+            Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Called function {}\n"), wide_func_name);
+            return JS_TRUE;
+        }
+        catch (const std::exception& e)
+        {
+            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] CallFunction exception: {}\n"), 
+                std::wstring(e.what(), e.what() + strlen(e.what())));
+            return JS_ThrowInternalError(ctx, "CallFunction failed due to exception");
+        }
+        catch (...)
+        {
+            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] CallFunction unknown exception\n"));
+            return JS_ThrowInternalError(ctx, "CallFunction failed due to unknown exception");
         }
     }
 
@@ -1214,6 +1535,171 @@ namespace RC::JSScript
         return false;
     }
 
+    auto JSMod::register_key_bind(JSContext* ctx, uint8_t key, JSValue callback, 
+                                  bool with_ctrl, bool with_shift, bool with_alt) -> bool
+    {
+        // Create key bind data
+        auto key_bind = std::make_unique<KeyBindCallback>();
+        key_bind->owner = this;
+        key_bind->ctx = ctx;
+        key_bind->callback = JS_DupValue(ctx, callback);
+        key_bind->key = key;
+        key_bind->with_ctrl = with_ctrl;
+        key_bind->with_shift = with_shift;
+        key_bind->with_alt = with_alt;
+
+        // Get raw pointer before moving
+        KeyBindCallback* raw_key_bind = key_bind.get();
+
+        // Store in our list
+        {
+            std::lock_guard<std::mutex> lock(m_key_bindings_mutex);
+            m_key_bindings.push_back(std::move(key_bind));
+        }
+
+        // Build modifier keys array
+        Input::Handler::ModifierKeyArray modifier_keys{};
+        size_t mod_idx = 0;
+        if (with_ctrl) modifier_keys[mod_idx++] = Input::ModifierKey::CONTROL;
+        if (with_shift) modifier_keys[mod_idx++] = Input::ModifierKey::SHIFT;
+        if (with_alt) modifier_keys[mod_idx++] = Input::ModifierKey::ALT;
+
+        // Register with UE4SS input system
+        auto& program = UE4SSProgram::get_program();
+        
+        if (with_ctrl || with_shift || with_alt)
+        {
+            program.register_keydown_event(
+                static_cast<Input::Key>(key),
+                modifier_keys,
+                [raw_key_bind]() {
+                    if (!raw_key_bind || !raw_key_bind->ctx) return;
+                    
+                    // Call the JS callback
+                    JSValue result = JS_Call(raw_key_bind->ctx, raw_key_bind->callback, JS_UNDEFINED, 0, nullptr);
+                    if (JS_IsException(result))
+                    {
+                        JSValue exception = JS_GetException(raw_key_bind->ctx);
+                        const char* str = JS_ToCString(raw_key_bind->ctx, exception);
+                        if (str)
+                        {
+                            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] KeyBind callback exception: {}\n"), 
+                                std::wstring(str, str + strlen(str)));
+                            JS_FreeCString(raw_key_bind->ctx, str);
+                        }
+                        JS_FreeValue(raw_key_bind->ctx, exception);
+                    }
+                    JS_FreeValue(raw_key_bind->ctx, result);
+                }
+            );
+        }
+        else
+        {
+            program.register_keydown_event(
+                static_cast<Input::Key>(key),
+                [raw_key_bind]() {
+                    if (!raw_key_bind || !raw_key_bind->ctx) return;
+                    
+                    // Call the JS callback
+                    JSValue result = JS_Call(raw_key_bind->ctx, raw_key_bind->callback, JS_UNDEFINED, 0, nullptr);
+                    if (JS_IsException(result))
+                    {
+                        JSValue exception = JS_GetException(raw_key_bind->ctx);
+                        const char* str = JS_ToCString(raw_key_bind->ctx, exception);
+                        if (str)
+                        {
+                            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] KeyBind callback exception: {}\n"), 
+                                std::wstring(str, str + strlen(str)));
+                            JS_FreeCString(raw_key_bind->ctx, str);
+                        }
+                        JS_FreeValue(raw_key_bind->ctx, exception);
+                    }
+                    JS_FreeValue(raw_key_bind->ctx, result);
+                }
+            );
+        }
+
+        Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Registered key bind for key 0x{:X} (ctrl={}, shift={}, alt={})\n"), 
+            key, with_ctrl, with_shift, with_alt);
+        
+        return true;
+    }
+
+    // Helper function to convert FProperty value to JSValue
+    static JSValue property_to_jsvalue(JSContext* ctx, Unreal::FProperty* prop, void* data)
+    {
+        if (!prop || !data)
+        {
+            return JS_NULL;
+        }
+
+        // Check for FStrProperty (FString)
+        if (prop->IsA<Unreal::FStrProperty>())
+        {
+            Unreal::FString* fstr = static_cast<Unreal::FString*>(data);
+            if (fstr && fstr->GetCharArray())
+            {
+                const wchar_t* wstr = fstr->GetCharArray();
+                // Convert wide string to UTF-8
+                std::wstring wide_str(wstr);
+                std::string utf8_str(wide_str.begin(), wide_str.end());
+                return JS_NewString(ctx, utf8_str.c_str());
+            }
+            return JS_NewString(ctx, "");
+        }
+
+        // Check for FNameProperty (FName)
+        if (prop->IsA<Unreal::FNameProperty>())
+        {
+            Unreal::FName* fname = static_cast<Unreal::FName*>(data);
+            if (fname)
+            {
+                std::wstring wide_str = fname->ToString();
+                std::string utf8_str(wide_str.begin(), wide_str.end());
+                return JS_NewString(ctx, utf8_str.c_str());
+            }
+            return JS_NewString(ctx, "");
+        }
+
+        // Check for FBoolProperty
+        if (prop->IsA<Unreal::FBoolProperty>())
+        {
+            Unreal::FBoolProperty* bool_prop = static_cast<Unreal::FBoolProperty*>(prop);
+            bool value = bool_prop->GetPropertyValue(data);
+            return JS_NewBool(ctx, value);
+        }
+
+        // Check for numeric properties (int, float, etc.)
+        if (prop->IsA<Unreal::FNumericProperty>())
+        {
+            Unreal::FNumericProperty* num_prop = static_cast<Unreal::FNumericProperty*>(prop);
+            if (num_prop->IsFloatingPoint())
+            {
+                double value = num_prop->GetFloatingPointPropertyValue(data);
+                return JS_NewFloat64(ctx, value);
+            }
+            else if (num_prop->IsInteger())
+            {
+                int64_t value = num_prop->GetSignedIntPropertyValue(data);
+                return JS_NewInt64(ctx, value);
+            }
+        }
+
+        // Check for FObjectProperty (UObject*)
+        if (prop->IsA<Unreal::FObjectProperty>())
+        {
+            Unreal::UObject** obj_ptr = static_cast<Unreal::UObject**>(data);
+            if (obj_ptr && *obj_ptr)
+            {
+                return JSUObject::create(ctx, *obj_ptr);
+            }
+            return JS_NULL;
+        }
+
+        // Default: return raw pointer as BigInt
+        return JS_NewBigInt64(ctx, reinterpret_cast<int64_t>(data));
+    }
+
     void JSMod::js_ufunction_hook_pre(Unreal::UnrealScriptFunctionCallableContext& context, void* custom_data)
     {
         auto* hook_data = static_cast<JSUFunctionHookData*>(custom_data);
@@ -1234,8 +1720,8 @@ namespace RC::JSScript
             --num_unreal_params;
         }
 
-        // Build parameters array
-        std::vector<void*> params;
+        // Build parameters array with type conversion
+        std::vector<std::pair<Unreal::FProperty*, void*>> params;
         bool has_properties_to_process = hook_data->has_return_value || num_unreal_params > 0;
         if (has_properties_to_process && (context.TheStack.Locals() || context.TheStack.OutParms()))
         {
@@ -1268,7 +1754,7 @@ namespace RC::JSScript
                     param_data = func_prop->ContainerPtrToValuePtr<void>(context.TheStack.Locals());
                 }
 
-                params.push_back(param_data);
+                params.push_back({func_prop, param_data});
             }
         }
 
@@ -1276,13 +1762,12 @@ namespace RC::JSScript
         JSValue args[3];
         args[0] = JSUObject::create(ctx, context.Context);  // 'this' UObject
 
-        // Create params array for JS
+        // Create params array for JS with automatic type conversion
         JSValue js_params = JS_NewArray(ctx);
         for (size_t i = 0; i < params.size(); i++)
         {
-            // For now, pass raw pointers as BigInt (can be extended to convert to proper JS types)
-            JS_SetPropertyUint32(ctx, js_params, static_cast<uint32_t>(i), 
-                JS_NewBigInt64(ctx, reinterpret_cast<int64_t>(params[i])));
+            JSValue js_param = property_to_jsvalue(ctx, params[i].first, params[i].second);
+            JS_SetPropertyUint32(ctx, js_params, static_cast<uint32_t>(i), js_param);
         }
         args[1] = js_params;
 
@@ -1328,8 +1813,8 @@ namespace RC::JSScript
             --num_unreal_params;
         }
 
-        // Build parameters array (same as pre-hook)
-        std::vector<void*> params;
+        // Build parameters array with type info (same as pre-hook)
+        std::vector<std::pair<Unreal::FProperty*, void*>> params;
         bool has_properties_to_process = hook_data->has_return_value || num_unreal_params > 0;
         if (has_properties_to_process && (context.TheStack.Locals() || context.TheStack.OutParms()))
         {
@@ -1362,7 +1847,7 @@ namespace RC::JSScript
                     param_data = func_prop->ContainerPtrToValuePtr<void>(context.TheStack.Locals());
                 }
 
-                params.push_back(param_data);
+                params.push_back({func_prop, param_data});
             }
         }
 
@@ -1370,12 +1855,12 @@ namespace RC::JSScript
         JSValue args[3];
         args[0] = JSUObject::create(ctx, context.Context);  // 'this' UObject
 
-        // Create params array for JS
+        // Create params array for JS with automatic type conversion
         JSValue js_params = JS_NewArray(ctx);
         for (size_t i = 0; i < params.size(); i++)
         {
-            JS_SetPropertyUint32(ctx, js_params, static_cast<uint32_t>(i), 
-                JS_NewBigInt64(ctx, reinterpret_cast<int64_t>(params[i])));
+            JSValue js_param = property_to_jsvalue(ctx, params[i].first, params[i].second);
+            JS_SetPropertyUint32(ctx, js_params, static_cast<uint32_t>(i), js_param);
         }
         args[1] = js_params;
 

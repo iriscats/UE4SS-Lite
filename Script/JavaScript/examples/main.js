@@ -12,6 +12,8 @@
  * - HookUFunction(ufunctionObj, preCallback, postCallback) - Register a UFunction hook by object
  * - UnregisterHook(preId, postId) - Unregister a previously registered hook
  * - NotifyOnNewObject(className, callback) - Get notified when object is created
+ * - RegisterKeyBind(key, callback, modifiers) - Register a keyboard shortcut
+ * - CallFunction(object, functionName, ...args) - Call a UFunction on an object
  * - setTimeout(callback, delayMs) - Execute callback after delay
  * - setInterval(callback, intervalMs) - Execute callback repeatedly
  * - clearTimeout(id) - Cancel a setTimeout
@@ -23,6 +25,14 @@
  * Hook Callback Parameters:
  * - preCallback(thisObject, paramsArray, returnValuePtr) - Called before function execution
  * - postCallback(thisObject, paramsArray, returnValuePtr) - Called after function execution
+ * 
+ * Key Names for RegisterKeyBind:
+ * - Letters: "A" - "Z"
+ * - Numbers: "0" - "9"
+ * - Function keys: "F1" - "F12"
+ * - Special: "SPACE", "ENTER", "ESC", "TAB", "BACKSPACE", "DELETE", "INSERT"
+ * - Navigation: "HOME", "END", "PAGEUP", "PAGEDOWN", "UP", "DOWN", "LEFT", "RIGHT"
+ * - Numpad: "NUM0" - "NUM9"
  */
 
 // Simple print test
@@ -95,32 +105,127 @@ setTimeout(function() {
 */
 
 // ============================================
-// Simple delayed execution test
+// Example 3: Loop until function is available (like C# Update pattern)
 // ============================================
 
-// Wait 3 seconds, then try to find GameEngine
-setTimeout(function() {
-    print("=== 3 seconds passed ===");
-    
-    var gameEngine = FindFirstOf("GameEngine");
-    if (gameEngine) {
-        print("Found GameEngine!");
-    } else {
-        print("GameEngine not found");
-    }
-}, 3000);
+// Track if we've already hooked
+var isHooked = false;
+var checkCount = 0;
 
-// Another test at 5 seconds
-setTimeout(function() {
-    print("=== 5 seconds passed ===");
-    
-    var players = FindAllOf("PlayerController");
-    if (players && players.length > 0) {
-        print("Found " + players.length + " PlayerController(s)");
-    } else {
-        print("No PlayerControllers found");
+// Pre-hook callback
+function onPreExecuteScript(thisObj, params, ret) {
+    print("OnExecuteScript Pre-hook fired!");
+    // params[0] is now automatically converted to JS string if it's FString
+    if (params && params.length > 0) {
+        print("  Script parameter:", params[0]);
     }
-}, 5000);
+}
 
-print("JavaScript script loaded successfully!");
-print("Waiting for delayed checks (3s and 5s)...");
+// Post-hook callback  
+function onPostExecuteScript(thisObj, params, ret) {
+    print("OnExecuteScript Post-hook fired!");
+    if (params && params.length > 0) {
+        print("  Script parameter:", params[0]);
+    }
+}
+
+// Hook registration function - tries to hook if function exists
+function tryHook() {
+    if (isHooked) {
+        return true;  // Already hooked
+    }
+
+    checkCount = checkCount + 1;
+    
+    // Try to find the UFunction
+    var funcPath = "/Game/ModIntegration/MI_SpawnMods.MI_SpawnMods_C:OnExecuteScript";
+    
+    try {
+        var ufunc = StaticFindObject(funcPath);
+        
+        if (!ufunc) {
+            // Function not found yet, will retry
+            if (checkCount % 10 === 0) {
+                print("Still waiting for UFunction... (check #" + checkCount + ")");
+            }
+            return false;
+        }
+
+        // Function found, register the hook
+        print("Found UFunction:", funcPath);
+        
+        var hookIds = HookUFunction(ufunc, onPreExecuteScript, onPostExecuteScript);
+        
+        if (hookIds && (hookIds[0] !== 0 || hookIds[1] !== 0)) {
+            print("Hook registered! Pre ID:", hookIds[0], ", Post ID:", hookIds[1]);
+            isHooked = true;
+            return true;
+        }
+    } catch (e) {
+        print("Error in tryHook:", e);
+    }
+    
+    return false;
+}
+
+// Start polling loop - check every 1000ms until hook is successful
+var hookCheckInterval = setInterval(function() {
+    try {
+        if (tryHook()) {
+            // Hook successful, stop the polling loop
+            clearInterval(hookCheckInterval);
+            print("Hook setup complete, stopped polling.");
+        }
+    } catch (e) {
+        print("Error in interval:", e);
+    }
+}, 1000);
+
+print("Started hook polling loop...");
+
+// ============================================
+// Example 4: Keyboard shortcuts
+// ============================================
+
+// Register F5 key to call OnExecuteScript with a string parameter
+RegisterKeyBind("F5", function() {
+    print("F5 pressed! Calling OnExecuteScript...");
+    
+    try {
+        // Find the MI_SpawnMods object
+        var spawnMods = FindFirstOf("MI_SpawnMods_C");
+        print("FindFirstOf result:", spawnMods);
+        
+        if (spawnMods) {
+            print("Found MI_SpawnMods_C:", spawnMods.GetFullName());
+            
+            // Call OnExecuteScript with a string parameter
+            var result = CallFunction(spawnMods, "OnExecuteScript", "Hello from JavaScript!");
+            print("CallFunction result:", result);
+        } else {
+            print("MI_SpawnMods_C not found, trying to find all instances...");
+            
+            // Try to list available objects
+            var allSpawnMods = FindAllOf("MI_SpawnMods_C");
+            print("FindAllOf result count:", allSpawnMods ? allSpawnMods.length : 0);
+        }
+    } catch (e) {
+        print("Error in F5 handler:", e);
+    }
+});
+
+// Register Ctrl+F6 to do something
+RegisterKeyBind("F6", function() {
+    print("Ctrl+F6 pressed! Searching for GameEngine...");
+    var engine = FindFirstOf("GameEngine");
+    if (engine) {
+        print("Found:", engine.GetFullName());
+    }
+}, { ctrl: true });
+
+// Register Ctrl+Shift+R to reload (example)
+RegisterKeyBind("R", function() {
+    print("Ctrl+Shift+R pressed!");
+}, { ctrl: true, shift: true });
+
+print("Key bindings registered: F5, Ctrl+F6, Ctrl+Shift+R");

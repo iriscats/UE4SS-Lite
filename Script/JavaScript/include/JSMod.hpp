@@ -69,6 +69,18 @@ namespace RC::JSScript
             bool cancelled;         // Timer was cancelled
         };
 
+        // Key binding callback data
+        struct KeyBindCallback
+        {
+            JSMod* owner;           // Pointer to JSMod instance
+            JSContext* ctx;         // JS context
+            JSValue callback;       // JS callback function
+            uint8_t key;            // Key code
+            bool with_ctrl;         // Requires CTRL
+            bool with_shift;        // Requires SHIFT
+            bool with_alt;          // Requires ALT
+        };
+
     public:
         // UFunction hook management (public for access from global functions)
         std::vector<std::unique_ptr<JSUFunctionHookData>> m_ufunction_hooks;
@@ -83,6 +95,10 @@ namespace RC::JSScript
         std::mutex m_timers_mutex;
         int32_t m_next_timer_id{1};
         double m_start_time{0.0};
+        
+        // Key binding management (public for access from global functions)
+        std::vector<std::unique_ptr<KeyBindCallback>> m_key_bindings;
+        std::mutex m_key_bindings_mutex;
         
         // Module cache (public for access from module loader)
         std::unordered_map<std::string, bool> m_loaded_modules;
@@ -118,6 +134,10 @@ namespace RC::JSScript
         auto register_ufunction_hook(JSContext* ctx, Unreal::UFunction* function, 
                                      JSValue pre_callback, JSValue post_callback) -> std::pair<int32_t, int32_t>;
         auto unregister_ufunction_hook(Unreal::CallbackId pre_id, Unreal::CallbackId post_id) -> bool;
+        
+        // Key binding management
+        auto register_key_bind(JSContext* ctx, uint8_t key, JSValue callback, 
+                              bool with_ctrl, bool with_shift, bool with_alt) -> bool;
 
         // Static hook callbacks for UE4SS hook system
         static void js_ufunction_hook_pre(Unreal::UnrealScriptFunctionCallableContext& context, void* custom_data);
