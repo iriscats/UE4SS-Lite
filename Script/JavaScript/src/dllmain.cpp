@@ -18,7 +18,9 @@ class JSScriptMod : public CppUserModBase
 {
 private:
     std::unique_ptr<JSScript::JSMod> m_js_mod;
-    bool m_scripts_loaded = false;
+    bool m_unreal_ready = false;      // Set when UE is initialized
+    bool m_engine_initialized = false; // Set when JS engine is initialized on event loop thread
+    bool m_scripts_loaded = false;     // Set when scripts are loaded
 
 public:
     JSScriptMod() : CppUserModBase()
@@ -28,21 +30,11 @@ public:
         ModDescription = STR("JavaScript scripting support via QuickJS engine");
         ModAuthors = STR("UE4SS Community");
         
-        Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Initializing JavaScript engine...\n"));
+        Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Mod loaded, waiting for event loop thread...\n"));
         
-        // Only initialize the runtime, but don't load scripts yet
-        // Scripts will be loaded in on_unreal_init when UE is ready
+        // Create JSMod instance but don't initialize yet
+        // All JS operations will happen on the event loop thread for thread safety
         m_js_mod = std::make_unique<JSScript::JSMod>();
-        
-        if (m_js_mod->init_engine())
-        {
-            Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] JavaScript engine initialized successfully\n"));
-            Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Waiting for on_unreal_init to load scripts...\n"));
-        }
-        else
-        {
-            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] Failed to initialize JavaScript engine\n"));
-        }
     }
 
     ~JSScriptMod() override
@@ -55,27 +47,48 @@ public:
 
     /**
      * Called when UE4 is fully initialized
-     * This is the safe time to execute scripts that access UE objects
+     * Just set a flag - actual initialization happens on event loop thread
      */
     auto on_unreal_init() -> void override
     {
         Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] on_unreal_init called - Unreal is ready\n"));
-        
-        // Now it's safe to load and execute scripts
-        if (m_js_mod && m_js_mod->is_initialized() && !m_scripts_loaded)
-        {
-            m_js_mod->load_scripts();
-            m_scripts_loaded = true;
-        }
+        m_unreal_ready = true;
     }
 
     /**
-     * Called every frame
-     * Used to process async JavaScript tasks and timers
+     * Called every frame on the event loop thread
+     * All JS operations happen here for thread safety
      */
     auto on_update() -> void override
     {
-        if (m_js_mod && m_js_mod->is_initialized())
+        if (!m_js_mod) return;
+        
+        // Initialize engine on first update (event loop thread)
+        if (!m_engine_initialized)
+        {
+            Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Initializing JS engine on event loop thread...\n"));
+            if (m_js_mod->init_engine())
+            {
+                m_engine_initialized = true;
+                Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] JS engine initialized on event loop thread\n"));
+            }
+            else
+            {
+                Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] Failed to initialize JS engine\n"));
+            }
+            return;
+        }
+        
+        // Load scripts once UE is ready (still on event loop thread)
+        if (m_unreal_ready && !m_scripts_loaded && m_js_mod->is_initialized())
+        {
+            Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Loading scripts on event loop thread...\n"));
+            m_js_mod->load_scripts();
+            m_scripts_loaded = true;
+        }
+        
+        // Normal tick
+        if (m_js_mod->is_initialized())
         {
             m_js_mod->tick();
         }

@@ -253,6 +253,49 @@ namespace RC::JSScript
             return;
         }
 
+        // Recursion guard - prevent re-entry if a callback triggers tick() again
+        if (m_in_tick)
+        {
+            return;
+        }
+        m_in_tick = true;
+
+        // Process pending keybind callbacks (thread-safety: execute on event loop thread)
+        {
+            std::vector<KeyBindCallback*> to_execute;
+            {
+                std::lock_guard<std::mutex> lock(m_pending_keybind_mutex);
+                to_execute.swap(m_pending_keybind_callbacks);
+            }
+            
+            for (auto* key_bind : to_execute)
+            {
+                if (!key_bind || !key_bind->ctx) continue;
+                
+                // Recursion guard
+                if (key_bind->is_executing) continue;
+                key_bind->is_executing = true;
+                
+                // Call the JS callback on event loop thread
+                JSValue result = JS_Call(key_bind->ctx, key_bind->callback, JS_UNDEFINED, 0, nullptr);
+                if (JS_IsException(result))
+                {
+                    JSValue exception = JS_GetException(key_bind->ctx);
+                    const char* str = JS_ToCString(key_bind->ctx, exception);
+                    if (str)
+                    {
+                        Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] KeyBind callback exception: {}\n"), 
+                            std::wstring(str, str + strlen(str)));
+                        JS_FreeCString(key_bind->ctx, str);
+                    }
+                    JS_FreeValue(key_bind->ctx, exception);
+                }
+                JS_FreeValue(key_bind->ctx, result);
+                
+                key_bind->is_executing = false;
+            }
+        }
+
         // Process timers
         process_timers();
 
@@ -267,6 +310,8 @@ namespace RC::JSScript
         {
             log_exception(ctx);
         }
+        
+        m_in_tick = false;
     }
     
     auto JSMod::get_current_time() const -> double
@@ -316,12 +361,13 @@ namespace RC::JSScript
         
         double current_time = get_current_time();
         
-        // Collect timer info we need (id, callback, is_interval) to fire
+        // Collect timer info we need (id, callback, is_interval, pointer to timer) to fire
         // We do this in two phases to avoid holding the lock during JS_Call
         struct TimerToFire {
             int32_t id;
             JSValue callback;
             bool is_interval;
+            TimerCallback* timer_ptr;  // Pointer to original timer for is_executing flag
         };
         std::vector<TimerToFire> to_fire;
         
@@ -331,10 +377,14 @@ namespace RC::JSScript
             for (auto& timer : m_timers)
             {
                 if (timer.cancelled) continue;
+                if (timer.is_executing) continue;  // Skip if already executing (recursion guard)
                 if (current_time < timer.trigger_time) continue;
                 
                 // Dup the callback so we have our own reference
-                to_fire.push_back({timer.id, JS_DupValue(timer.ctx, timer.callback), timer.is_interval});
+                to_fire.push_back({timer.id, JS_DupValue(timer.ctx, timer.callback), timer.is_interval, &timer});
+                
+                // Set executing flag
+                timer.is_executing = true;
                 
                 if (timer.is_interval)
                 {
@@ -343,18 +393,10 @@ namespace RC::JSScript
                 }
                 else
                 {
-                    // Mark setTimeout for cleanup
+                    // Mark setTimeout for cleanup (but don't free callback yet - we're using the dup'd version)
                     timer.cancelled = true;
-                    JS_FreeValue(timer.ctx, timer.callback);
                 }
             }
-            
-            // Clean up cancelled non-interval timers
-            m_timers.erase(
-                std::remove_if(m_timers.begin(), m_timers.end(),
-                    [](const TimerCallback& t) { return t.cancelled && !t.is_interval; }),
-                m_timers.end()
-            );
         }
         
         // Now fire callbacks without holding the lock
@@ -367,6 +409,30 @@ namespace RC::JSScript
             }
             JS_FreeValue(m_main_ctx, result);
             JS_FreeValue(m_main_ctx, item.callback);  // Free our dup'd reference
+            
+            // Clear executing flag
+            if (item.timer_ptr)
+            {
+                item.timer_ptr->is_executing = false;
+            }
+        }
+        
+        // Clean up cancelled timers (separate pass to avoid issues with timer_ptr)
+        {
+            std::lock_guard<std::mutex> lock(m_timers_mutex);
+            for (auto& timer : m_timers)
+            {
+                if (timer.cancelled && !timer.is_interval && timer.ctx)
+                {
+                    JS_FreeValue(timer.ctx, timer.callback);
+                    timer.ctx = nullptr;  // Mark as freed
+                }
+            }
+            m_timers.erase(
+                std::remove_if(m_timers.begin(), m_timers.end(),
+                    [](const TimerCallback& t) { return t.cancelled && !t.is_interval; }),
+                m_timers.end()
+            );
         }
     }
 
@@ -1567,29 +1633,22 @@ namespace RC::JSScript
         // Register with UE4SS input system
         auto& program = UE4SSProgram::get_program();
         
+        // Lambda to queue keybind callback for execution on event loop thread (thread-safety fix)
+        auto queue_keybind_callback = [this](KeyBindCallback* key_bind) {
+            if (!key_bind || !key_bind->ctx) return;
+            
+            // Add to pending queue (thread-safe)
+            std::lock_guard<std::mutex> lock(m_pending_keybind_mutex);
+            m_pending_keybind_callbacks.push_back(key_bind);
+        };
+
         if (with_ctrl || with_shift || with_alt)
         {
             program.register_keydown_event(
                 static_cast<Input::Key>(key),
                 modifier_keys,
-                [raw_key_bind]() {
-                    if (!raw_key_bind || !raw_key_bind->ctx) return;
-                    
-                    // Call the JS callback
-                    JSValue result = JS_Call(raw_key_bind->ctx, raw_key_bind->callback, JS_UNDEFINED, 0, nullptr);
-                    if (JS_IsException(result))
-                    {
-                        JSValue exception = JS_GetException(raw_key_bind->ctx);
-                        const char* str = JS_ToCString(raw_key_bind->ctx, exception);
-                        if (str)
-                        {
-                            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] KeyBind callback exception: {}\n"), 
-                                std::wstring(str, str + strlen(str)));
-                            JS_FreeCString(raw_key_bind->ctx, str);
-                        }
-                        JS_FreeValue(raw_key_bind->ctx, exception);
-                    }
-                    JS_FreeValue(raw_key_bind->ctx, result);
+                [raw_key_bind, queue_keybind_callback]() {
+                    queue_keybind_callback(raw_key_bind);
                 }
             );
         }
@@ -1597,24 +1656,8 @@ namespace RC::JSScript
         {
             program.register_keydown_event(
                 static_cast<Input::Key>(key),
-                [raw_key_bind]() {
-                    if (!raw_key_bind || !raw_key_bind->ctx) return;
-                    
-                    // Call the JS callback
-                    JSValue result = JS_Call(raw_key_bind->ctx, raw_key_bind->callback, JS_UNDEFINED, 0, nullptr);
-                    if (JS_IsException(result))
-                    {
-                        JSValue exception = JS_GetException(raw_key_bind->ctx);
-                        const char* str = JS_ToCString(raw_key_bind->ctx, exception);
-                        if (str)
-                        {
-                            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] KeyBind callback exception: {}\n"), 
-                                std::wstring(str, str + strlen(str)));
-                            JS_FreeCString(raw_key_bind->ctx, str);
-                        }
-                        JS_FreeValue(raw_key_bind->ctx, exception);
-                    }
-                    JS_FreeValue(raw_key_bind->ctx, result);
+                [raw_key_bind, queue_keybind_callback]() {
+                    queue_keybind_callback(raw_key_bind);
                 }
             );
         }
@@ -1708,6 +1751,13 @@ namespace RC::JSScript
             return;
         }
 
+        // Recursion guard - prevent re-entry if the hook callback triggers the same function
+        if (hook_data->is_executing)
+        {
+            return;
+        }
+        hook_data->is_executing = true;
+
         JSContext* ctx = hook_data->ctx;
 
         // Get function parameters
@@ -1795,6 +1845,9 @@ namespace RC::JSScript
         JS_FreeValue(ctx, args[0]);
         JS_FreeValue(ctx, args[1]);
         JS_FreeValue(ctx, args[2]);
+        
+        // Clear recursion guard
+        hook_data->is_executing = false;
     }
 
     void JSMod::js_ufunction_hook_post(Unreal::UnrealScriptFunctionCallableContext& context, void* custom_data)
@@ -1804,6 +1857,14 @@ namespace RC::JSScript
         {
             return;
         }
+
+        // Note: We share is_executing with pre_hook, so if pre_hook is still executing, skip post_hook too
+        // This prevents issues when the hooked function is called recursively
+        if (hook_data->is_executing)
+        {
+            return;
+        }
+        hook_data->is_executing = true;
 
         JSContext* ctx = hook_data->ctx;
 
@@ -1888,6 +1949,9 @@ namespace RC::JSScript
         JS_FreeValue(ctx, args[0]);
         JS_FreeValue(ctx, args[1]);
         JS_FreeValue(ctx, args[2]);
+        
+        // Clear recursion guard
+        hook_data->is_executing = false;
     }
 
     // ============================================

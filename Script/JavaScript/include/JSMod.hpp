@@ -47,6 +47,7 @@ namespace RC::JSScript
             Unreal::CallbackId pre_id;         // Pre-hook callback ID
             Unreal::CallbackId post_id;        // Post-hook callback ID
             bool has_return_value;             // Does the function have a return value
+            bool is_executing{false};          // Recursion guard - prevents re-entry during hook execution
         };
 
         // Legacy callback data for hooks (kept for compatibility)
@@ -67,6 +68,7 @@ namespace RC::JSScript
             double interval;        // Interval for setInterval (0 for setTimeout)
             bool is_interval;       // true = setInterval, false = setTimeout
             bool cancelled;         // Timer was cancelled
+            bool is_executing{false}; // Recursion guard - prevents re-entry during callback execution
         };
 
         // Key binding callback data
@@ -79,6 +81,7 @@ namespace RC::JSScript
             bool with_ctrl;         // Requires CTRL
             bool with_shift;        // Requires SHIFT
             bool with_alt;          // Requires ALT
+            bool is_executing{false}; // Recursion guard - prevents re-entry during callback execution
         };
 
     public:
@@ -100,6 +103,10 @@ namespace RC::JSScript
         std::vector<std::unique_ptr<KeyBindCallback>> m_key_bindings;
         std::mutex m_key_bindings_mutex;
         
+        // Pending keybind callbacks to execute on main thread (thread-safety fix)
+        std::vector<KeyBindCallback*> m_pending_keybind_callbacks;
+        std::mutex m_pending_keybind_mutex;
+        
         // Module cache (public for access from module loader)
         std::unordered_map<std::string, bool> m_loaded_modules;
 
@@ -109,6 +116,7 @@ namespace RC::JSScript
         JSContext* m_main_ctx{nullptr};
         
         bool m_initialized{false};
+        bool m_in_tick{false};  // Recursion guard for tick()
 
     public:
         JSMod();
