@@ -5,6 +5,9 @@
 #include <sstream>
 #include <chrono>
 
+#define NOMINMAX
+#include <Windows.h>
+
 #include <DynamicOutput/DynamicOutput.hpp>
 #include <UE4SSProgram.hpp>
 #include <Unreal/UObjectGlobals.hpp>
@@ -16,6 +19,7 @@
 #include <Unreal/FFrame.hpp>
 #include <Unreal/UnrealFlags.hpp>
 #include <Unreal/FString.hpp>
+#include <Unreal/Hooks.hpp>
 #include <Unreal/Property/FStrProperty.hpp>
 #include <Unreal/Property/FBoolProperty.hpp>
 #include <Unreal/Property/FNumericProperty.hpp>
@@ -117,6 +121,7 @@ namespace RC::JSScript
         setup_module_loader();
 
         m_initialized = true;
+        m_event_loop_thread_id = std::this_thread::get_id();
         return true;
     }
     
@@ -143,6 +148,9 @@ namespace RC::JSScript
                 load_and_execute_script(script);
             }
         }
+
+        // Setup game thread dispatcher for RPC net function calls
+        setup_game_thread_dispatcher();
     }
 
     auto JSMod::stop() -> void
@@ -226,6 +234,23 @@ namespace RC::JSScript
             m_key_bindings.clear();
         }
 
+        // Clean up pending game thread calls
+        {
+            std::lock_guard<std::mutex> lock(m_pending_game_thread_mutex);
+            for (auto& call : m_pending_game_thread_calls)
+            {
+                for (auto* buf : call.raw_string_buffers) { free(buf); }
+                if (call.params_memory) { free(call.params_memory); }
+            }
+            m_pending_game_thread_calls.clear();
+        }
+
+        // Clean up pending hook callbacks
+        {
+            std::lock_guard<std::mutex> lock(m_pending_hook_callbacks_mutex);
+            m_pending_hook_callbacks.clear();
+        }
+
         // Free context
         if (m_main_ctx)
         {
@@ -293,6 +318,72 @@ namespace RC::JSScript
                 JS_FreeValue(key_bind->ctx, result);
                 
                 key_bind->is_executing = false;
+            }
+        }
+
+        // Process pending hook callbacks (queued from game thread for thread-safe JS execution)
+        {
+            std::vector<PendingHookCallback> hooks_to_execute;
+            {
+                std::lock_guard<std::mutex> lock(m_pending_hook_callbacks_mutex);
+                hooks_to_execute.swap(m_pending_hook_callbacks);
+            }
+
+            for (auto& pending : hooks_to_execute)
+            {
+                if (!pending.hook_data || !pending.hook_data->ctx) continue;
+
+                JSContext* ctx = pending.hook_data->ctx;
+                JSValue callback = pending.is_pre ? pending.hook_data->pre_callback : pending.hook_data->post_callback;
+
+                if (JS_IsUndefined(callback)) continue;
+
+                // Build JS arguments from raw C++ data
+                JSValue args[3];
+                args[0] = pending.context_object ? JSUObject::create(ctx, pending.context_object) : JS_NULL;
+
+                // Convert raw params to JS array
+                JSValue js_params = JS_NewArray(ctx);
+                for (size_t i = 0; i < pending.params.size(); i++)
+                {
+                    JSValue param_val;
+                    switch (pending.params[i].type)
+                    {
+                        case PendingHookCallbackParam::Type::String: {
+                            std::string utf8(pending.params[i].str_val.begin(), pending.params[i].str_val.end());
+                            param_val = JS_NewString(ctx, utf8.c_str());
+                            break;
+                        }
+                        case PendingHookCallbackParam::Type::Int:
+                            param_val = JS_NewInt64(ctx, pending.params[i].int_val);
+                            break;
+                        case PendingHookCallbackParam::Type::Float:
+                            param_val = JS_NewFloat64(ctx, pending.params[i].float_val);
+                            break;
+                        case PendingHookCallbackParam::Type::Bool:
+                            param_val = JS_NewBool(ctx, pending.params[i].bool_val);
+                            break;
+                        case PendingHookCallbackParam::Type::Object:
+                            param_val = pending.params[i].obj_val ? JSUObject::create(ctx, pending.params[i].obj_val) : JS_NULL;
+                            break;
+                        default:
+                            param_val = JS_NULL;
+                            break;
+                    }
+                    JS_SetPropertyUint32(ctx, js_params, static_cast<uint32_t>(i), param_val);
+                }
+                args[1] = js_params;
+                args[2] = JS_UNDEFINED;  // return value not available for deferred hooks
+
+                // Call the JS callback
+                JSValue result = JS_Call(ctx, callback, JS_UNDEFINED, 3, args);
+                if (JS_IsException(result))
+                {
+                    log_exception(ctx);
+                }
+                JS_FreeValue(ctx, result);
+                JS_FreeValue(ctx, args[0]);
+                JS_FreeValue(ctx, args[1]);
             }
         }
 
@@ -1251,6 +1342,32 @@ namespace RC::JSScript
     // Function Call Implementation
     // ============================================
 
+    // SEH-protected wrapper for ProcessEvent to prevent game crashes
+    // Must be a separate function because __try/__except cannot coexist with C++ destructors
+    static DWORD s_last_seh_code = 0;
+
+    static LONG seh_filter(DWORD code)
+    {
+        s_last_seh_code = code;
+        return EXCEPTION_EXECUTE_HANDLER;
+    }
+
+    static bool safe_process_event(Unreal::UObject* object, Unreal::UFunction* function, void* params)
+    {
+        s_last_seh_code = 0;
+        __try
+        {
+            object->ProcessEvent(function, params);
+            return true;
+        }
+        __except(seh_filter(GetExceptionCode()))
+        {
+            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] ProcessEvent CRASHED with SEH exception code: 0x{:08X}\n"), s_last_seh_code);
+            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] This likely means ProcessEvent cannot be safely called for this function from the event loop thread.\n"));
+            return false;
+        }
+    }
+
     // CallFunction(object, functionName, ...args) - Call a UFunction on an object
     // For string parameters, pass JS strings directly
     static JSValue js_call_function(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
@@ -1288,7 +1405,7 @@ namespace RC::JSScript
 
             // Get function parameter info
             int32_t params_size = function->GetParmsSize();
-            
+
             // Allocate parameters memory
             void* params_memory = nullptr;
             if (params_size > 0)
@@ -1299,6 +1416,9 @@ namespace RC::JSScript
                     return JS_ThrowInternalError(ctx, "Failed to allocate params memory");
                 }
             }
+
+            // Track raw string buffers for cleanup
+            std::vector<wchar_t*> raw_string_buffers;
 
             // Fill in parameters from JS arguments
             int js_arg_index = 2;  // Start after object and function name
@@ -1323,15 +1443,37 @@ namespace RC::JSScript
                 // Handle different property types
                 if (prop->IsA<Unreal::FStrProperty>())
                 {
-                    // String parameter
+                    // String parameter - manually construct raw FString layout
+                    // FString memory layout: { wchar_t* Data, int32_t Num, int32_t Max }
                     const char* str_val = JS_ToCString(ctx, argv[js_arg_index]);
                     if (str_val)
                     {
                         std::wstring wide_str(str_val, str_val + strlen(str_val));
                         JS_FreeCString(ctx, str_val);
                         
-                        // Construct FString in place
-                        new (prop_addr) Unreal::FString(wide_str.c_str());
+                        int32_t num = static_cast<int32_t>(wide_str.length()) + 1; // including null terminator
+                        int32_t max = num;
+                        
+                        // Allocate buffer with standard allocator (like C# Marshal.AllocHGlobal)
+                        wchar_t* buffer = static_cast<wchar_t*>(malloc(num * sizeof(wchar_t)));
+                        if (buffer)
+                        {
+                            std::memcpy(buffer, wide_str.c_str(), wide_str.length() * sizeof(wchar_t));
+                            buffer[wide_str.length()] = L'\0';
+                            raw_string_buffers.push_back(buffer);
+                            
+                            // Write raw FString struct: {Data*, Num, Max}
+                            struct RawFString {
+                                wchar_t* Data;
+                                int32_t Num;
+                                int32_t Max;
+                            };
+                            auto* raw_fstr = static_cast<RawFString*>(prop_addr);
+                            raw_fstr->Data = buffer;
+                            raw_fstr->Num = num;
+                            raw_fstr->Max = max;
+                        }
+                        
                     }
                 }
                 else if (prop->IsA<Unreal::FBoolProperty>())
@@ -1367,17 +1509,63 @@ namespace RC::JSScript
                 js_arg_index++;
             }
 
-            // Call the function
-            object->ProcessEvent(function, params_memory);
+            // Check if function has network flags (FUNC_Net) - if so, queue for game thread
+            // execution so that UE4's RPC replication system can send the call to clients.
+            bool has_net_flags = function->HasAnyFunctionFlags(Unreal::EFunctionFlags::FUNC_Net);
 
-            // Clean up
+            if (has_net_flags)
+            {
+                JSMod* mod = get_js_mod(ctx);
+                if (mod && mod->m_game_thread_callback_registered)
+                {
+                    Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Queueing net function {} for game thread execution (RPC)\n"), wide_func_name);
+
+                    JSMod::PendingGameThreadCall pending;
+                    pending.object = object;
+                    pending.function = function;
+                    pending.params_memory = params_memory;
+                    pending.raw_string_buffers = std::move(raw_string_buffers);
+
+                    {
+                        std::lock_guard<std::mutex> lock(mod->m_pending_game_thread_mutex);
+                        mod->m_pending_game_thread_calls.push_back(std::move(pending));
+                    }
+
+                    // Ownership of params_memory and raw_string_buffers transferred to queue.
+                    // Do NOT free them here - the game thread callback will handle cleanup.
+                    Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Net function {} queued successfully\n"), wide_func_name);
+                    return JS_TRUE;
+                }
+                else
+                {
+                    Output::send<LogLevel::Warning>(STR("[UE4SSL.JavaScript] Net function {} - game thread dispatcher not ready, falling back to event loop thread\n"), wide_func_name);
+                }
+            }
+
+            // Non-net function (or dispatcher not ready): execute immediately with SEH protection
+            bool process_event_ok = safe_process_event(object, function, params_memory);
+
+            // Clean up raw string buffers
+            for (auto* buf : raw_string_buffers)
+            {
+                free(buf);
+            }
+
+            // Clean up params memory
             if (params_memory)
             {
                 free(params_memory);
             }
 
-            Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Called function {}\n"), wide_func_name);
-            return JS_TRUE;
+            if (process_event_ok)
+            {
+                Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Called function {}\n"), wide_func_name);
+                return JS_TRUE;
+            }
+            else
+            {
+                return JS_ThrowInternalError(ctx, "ProcessEvent crashed (SEH exception caught)");
+            }
         }
         catch (const std::exception& e)
         {
@@ -1540,27 +1728,22 @@ namespace RC::JSScript
             m_ufunction_hooks.push_back(std::move(hook_data));
         }
 
-        // Register hooks with UE4SS hook system
-        Unreal::CallbackId pre_id = 0;
-        Unreal::CallbackId post_id = 0;
+        // Use UObjectGlobals::RegisterHook which correctly handles both
+        // Native functions (FuncPtr hook) and Script/Blueprint functions (GlobalScriptHook)
+        auto [generic_pre_id, generic_post_id] = Unreal::UObjectGlobals::RegisterHook(
+            function,
+            js_ufunction_hook_pre,
+            js_ufunction_hook_post,
+            raw_hook_data
+        );
 
-        if (!JS_IsUndefined(raw_hook_data->pre_callback))
-        {
-            pre_id = function->RegisterPreHook(js_ufunction_hook_pre, raw_hook_data);
-            raw_hook_data->pre_id = pre_id;
-            Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Registered pre-hook (id={}) for {}\n"), 
-                pre_id, function->GetFullName());
-        }
+        raw_hook_data->pre_id = generic_pre_id;
+        raw_hook_data->post_id = generic_post_id;
 
-        if (!JS_IsUndefined(raw_hook_data->post_callback))
-        {
-            post_id = function->RegisterPostHook(js_ufunction_hook_post, raw_hook_data);
-            raw_hook_data->post_id = post_id;
-            Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Registered post-hook (id={}) for {}\n"), 
-                post_id, function->GetFullName());
-        }
+        Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Registered hook (pre_id={}, post_id={}) for {}\n"), 
+            generic_pre_id, generic_post_id, function->GetFullName());
 
-        return {pre_id, post_id};
+        return {generic_pre_id, generic_post_id};
     }
 
     auto JSMod::unregister_ufunction_hook(Unreal::CallbackId pre_id, Unreal::CallbackId post_id) -> bool
@@ -1572,16 +1755,10 @@ namespace RC::JSScript
             auto& hook = *it;
             if (hook && (hook->pre_id == pre_id || hook->post_id == post_id))
             {
+                // Use global UnregisterHook which handles both Native and Script hooks
                 if (hook->function)
                 {
-                    if (hook->pre_id != 0)
-                    {
-                        hook->function->UnregisterHook(hook->pre_id);
-                    }
-                    if (hook->post_id != 0)
-                    {
-                        hook->function->UnregisterHook(hook->post_id);
-                    }
+                    Unreal::UObjectGlobals::UnregisterHook(hook->function, {hook->pre_id, hook->post_id});
                 }
                 if (hook->ctx)
                 {
@@ -1599,6 +1776,50 @@ namespace RC::JSScript
             }
         }
         return false;
+    }
+
+    auto JSMod::setup_game_thread_dispatcher() -> void
+    {
+        if (m_game_thread_callback_registered) return;
+
+        Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Setting up game thread dispatcher for RPC calls...\n"));
+
+        // Register a ProcessEvent pre-callback that runs on the game thread.
+        // This drains our pending queue of net-function calls so RPC replication works.
+        Unreal::Hook::RegisterProcessEventPreCallback(
+            [this](Unreal::UObject* /*Context*/, Unreal::UFunction* /*Function*/, void* /*Parms*/) {
+                std::vector<PendingGameThreadCall> to_execute;
+                {
+                    std::lock_guard<std::mutex> lock(m_pending_game_thread_mutex);
+                    if (m_pending_game_thread_calls.empty()) return;
+                    to_execute.swap(m_pending_game_thread_calls);
+                }
+
+                for (auto& call : to_execute)
+                {
+                    Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Executing queued RPC call on game thread: {}\n"),
+                        call.function->GetFullName());
+
+                    bool ok = safe_process_event(call.object, call.function, call.params_memory);
+
+                    if (ok)
+                    {
+                        Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Game thread ProcessEvent completed successfully\n"));
+                    }
+                    else
+                    {
+                        Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] Game thread ProcessEvent CRASHED (SEH 0x{:08X})\n"), s_last_seh_code);
+                    }
+
+                    // Cleanup
+                    for (auto* buf : call.raw_string_buffers) { free(buf); }
+                    if (call.params_memory) { free(call.params_memory); }
+                }
+            }
+        );
+
+        m_game_thread_callback_registered = true;
+        Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Game thread dispatcher registered successfully\n"));
     }
 
     auto JSMod::register_key_bind(JSContext* ctx, uint8_t key, JSValue callback, 
@@ -1756,11 +1977,8 @@ namespace RC::JSScript
         {
             return;
         }
-        hook_data->is_executing = true;
 
-        JSContext* ctx = hook_data->ctx;
-
-        // Get function parameters
+        // Get function parameters (safe on any thread - reads UE memory)
         uint16_t return_value_offset = context.TheStack.CurrentNativeFunction()->GetReturnValueOffset();
         hook_data->has_return_value = return_value_offset != 0xFFFF;
 
@@ -1770,7 +1988,7 @@ namespace RC::JSScript
             --num_unreal_params;
         }
 
-        // Build parameters array with type conversion
+        // Extract parameter data (property + pointer pairs)
         std::vector<std::pair<Unreal::FProperty*, void*>> params;
         bool has_properties_to_process = hook_data->has_return_value || num_unreal_params > 0;
         if (has_properties_to_process && (context.TheStack.Locals() || context.TheStack.OutParms()))
@@ -1807,6 +2025,88 @@ namespace RC::JSScript
                 params.push_back({func_prop, param_data});
             }
         }
+
+        // Thread safety check: if not on the event loop thread, extract raw values and queue for later
+        bool on_event_loop_thread = true;
+        if (hook_data->owner && hook_data->owner->m_event_loop_thread_id != std::thread::id{} &&
+            std::this_thread::get_id() != hook_data->owner->m_event_loop_thread_id)
+        {
+            on_event_loop_thread = false;
+        }
+
+        if (!on_event_loop_thread)
+        {
+            // Game thread path: extract parameter values as C++ types and queue for event loop thread
+            JSMod::PendingHookCallback pending;
+            pending.hook_data = hook_data;
+            pending.is_pre = true;
+            pending.context_object = context.Context;
+
+            // Extract raw parameter values (safe to read on game thread during hook callback)
+            for (auto& [prop, data] : params)
+            {
+                JSMod::PendingHookCallbackParam p;
+                if (!data)
+                {
+                    pending.params.push_back(p);
+                    continue;
+                }
+
+                if (prop->IsA<Unreal::FStrProperty>())
+                {
+                    p.type = JSMod::PendingHookCallbackParam::Type::String;
+                    Unreal::FString* fstr = static_cast<Unreal::FString*>(data);
+                    if (fstr && fstr->GetCharArray())
+                    {
+                        p.str_val = fstr->GetCharArray();
+                    }
+                }
+                else if (prop->IsA<Unreal::FNameProperty>())
+                {
+                    p.type = JSMod::PendingHookCallbackParam::Type::String;
+                    Unreal::FName* fname = static_cast<Unreal::FName*>(data);
+                    if (fname) { p.str_val = fname->ToString(); }
+                }
+                else if (prop->IsA<Unreal::FBoolProperty>())
+                {
+                    p.type = JSMod::PendingHookCallbackParam::Type::Bool;
+                    p.bool_val = static_cast<Unreal::FBoolProperty*>(prop)->GetPropertyValue(data);
+                }
+                else if (prop->IsA<Unreal::FNumericProperty>())
+                {
+                    auto* num_prop = static_cast<Unreal::FNumericProperty*>(prop);
+                    if (num_prop->IsFloatingPoint())
+                    {
+                        p.type = JSMod::PendingHookCallbackParam::Type::Float;
+                        p.float_val = num_prop->GetFloatingPointPropertyValue(data);
+                    }
+                    else if (num_prop->IsInteger())
+                    {
+                        p.type = JSMod::PendingHookCallbackParam::Type::Int;
+                        p.int_val = num_prop->GetSignedIntPropertyValue(data);
+                    }
+                }
+                else if (prop->IsA<Unreal::FObjectProperty>())
+                {
+                    p.type = JSMod::PendingHookCallbackParam::Type::Object;
+                    Unreal::UObject** obj_ptr = static_cast<Unreal::UObject**>(data);
+                    p.obj_val = (obj_ptr && *obj_ptr) ? *obj_ptr : nullptr;
+                }
+
+                pending.params.push_back(std::move(p));
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(hook_data->owner->m_pending_hook_callbacks_mutex);
+                hook_data->owner->m_pending_hook_callbacks.push_back(std::move(pending));
+            }
+            return;
+        }
+
+        // Event loop thread path: call JS directly
+        hook_data->is_executing = true;
+
+        JSContext* ctx = hook_data->ctx;
 
         // Create JS arguments: (context_uobject, params_array, return_value_ptr)
         JSValue args[3];
@@ -1864,9 +2164,6 @@ namespace RC::JSScript
         {
             return;
         }
-        hook_data->is_executing = true;
-
-        JSContext* ctx = hook_data->ctx;
 
         uint8_t num_unreal_params = context.TheStack.CurrentNativeFunction()->GetNumParms();
         if (hook_data->has_return_value)
@@ -1874,7 +2171,7 @@ namespace RC::JSScript
             --num_unreal_params;
         }
 
-        // Build parameters array with type info (same as pre-hook)
+        // Extract parameter data (property + pointer pairs)
         std::vector<std::pair<Unreal::FProperty*, void*>> params;
         bool has_properties_to_process = hook_data->has_return_value || num_unreal_params > 0;
         if (has_properties_to_process && (context.TheStack.Locals() || context.TheStack.OutParms()))
@@ -1911,6 +2208,84 @@ namespace RC::JSScript
                 params.push_back({func_prop, param_data});
             }
         }
+
+        // Thread safety check: if not on the event loop thread, extract raw values and queue
+        bool on_event_loop_thread = true;
+        if (hook_data->owner && hook_data->owner->m_event_loop_thread_id != std::thread::id{} &&
+            std::this_thread::get_id() != hook_data->owner->m_event_loop_thread_id)
+        {
+            on_event_loop_thread = false;
+        }
+
+        if (!on_event_loop_thread)
+        {
+            // Game thread path: extract raw values and queue
+            JSMod::PendingHookCallback pending;
+            pending.hook_data = hook_data;
+            pending.is_pre = false;
+            pending.context_object = context.Context;
+
+            for (auto& [prop, data] : params)
+            {
+                JSMod::PendingHookCallbackParam p;
+                if (!data)
+                {
+                    pending.params.push_back(p);
+                    continue;
+                }
+
+                if (prop->IsA<Unreal::FStrProperty>())
+                {
+                    p.type = JSMod::PendingHookCallbackParam::Type::String;
+                    Unreal::FString* fstr = static_cast<Unreal::FString*>(data);
+                    if (fstr && fstr->GetCharArray()) { p.str_val = fstr->GetCharArray(); }
+                }
+                else if (prop->IsA<Unreal::FNameProperty>())
+                {
+                    p.type = JSMod::PendingHookCallbackParam::Type::String;
+                    Unreal::FName* fname = static_cast<Unreal::FName*>(data);
+                    if (fname) { p.str_val = fname->ToString(); }
+                }
+                else if (prop->IsA<Unreal::FBoolProperty>())
+                {
+                    p.type = JSMod::PendingHookCallbackParam::Type::Bool;
+                    p.bool_val = static_cast<Unreal::FBoolProperty*>(prop)->GetPropertyValue(data);
+                }
+                else if (prop->IsA<Unreal::FNumericProperty>())
+                {
+                    auto* num_prop = static_cast<Unreal::FNumericProperty*>(prop);
+                    if (num_prop->IsFloatingPoint())
+                    {
+                        p.type = JSMod::PendingHookCallbackParam::Type::Float;
+                        p.float_val = num_prop->GetFloatingPointPropertyValue(data);
+                    }
+                    else if (num_prop->IsInteger())
+                    {
+                        p.type = JSMod::PendingHookCallbackParam::Type::Int;
+                        p.int_val = num_prop->GetSignedIntPropertyValue(data);
+                    }
+                }
+                else if (prop->IsA<Unreal::FObjectProperty>())
+                {
+                    p.type = JSMod::PendingHookCallbackParam::Type::Object;
+                    Unreal::UObject** obj_ptr = static_cast<Unreal::UObject**>(data);
+                    p.obj_val = (obj_ptr && *obj_ptr) ? *obj_ptr : nullptr;
+                }
+
+                pending.params.push_back(std::move(p));
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(hook_data->owner->m_pending_hook_callbacks_mutex);
+                hook_data->owner->m_pending_hook_callbacks.push_back(std::move(pending));
+            }
+            return;
+        }
+
+        // Event loop thread path: call JS directly
+        hook_data->is_executing = true;
+
+        JSContext* ctx = hook_data->ctx;
 
         // Create JS arguments: (context_uobject, params_array, return_value_ptr)
         JSValue args[3];

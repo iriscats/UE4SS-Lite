@@ -84,6 +84,36 @@ namespace RC::JSScript
             bool is_executing{false}; // Recursion guard - prevents re-entry during callback execution
         };
 
+        // Pending game thread ProcessEvent call (for RPC/net functions)
+        struct PendingGameThreadCall
+        {
+            Unreal::UObject* object;
+            Unreal::UFunction* function;
+            void* params_memory;
+            std::vector<wchar_t*> raw_string_buffers;
+        };
+
+        // A single hook parameter value extracted on the game thread (as C++ types, not JSValue)
+        struct PendingHookCallbackParam
+        {
+            enum class Type { String, Int, Float, Bool, Object, Unknown };
+            Type type{Type::Unknown};
+            std::wstring str_val{};
+            int64_t int_val{0};
+            double float_val{0.0};
+            bool bool_val{false};
+            Unreal::UObject* obj_val{nullptr};
+        };
+
+        // A hook callback queued from the game thread for deferred execution on the event loop thread
+        struct PendingHookCallback
+        {
+            JSUFunctionHookData* hook_data;       // Pointer to hook data (owns JS callback refs)
+            bool is_pre;                           // true = pre-callback, false = post-callback
+            Unreal::UObject* context_object;       // 'this' UObject
+            std::vector<PendingHookCallbackParam> params;
+        };
+
     public:
         // UFunction hook management (public for access from global functions)
         std::vector<std::unique_ptr<JSUFunctionHookData>> m_ufunction_hooks;
@@ -106,6 +136,16 @@ namespace RC::JSScript
         // Pending keybind callbacks to execute on main thread (thread-safety fix)
         std::vector<KeyBindCallback*> m_pending_keybind_callbacks;
         std::mutex m_pending_keybind_mutex;
+
+        // Game thread call queue (for RPC-enabled net functions)
+        std::vector<PendingGameThreadCall> m_pending_game_thread_calls;
+        std::mutex m_pending_game_thread_mutex;
+        std::thread::id m_event_loop_thread_id{};
+        bool m_game_thread_callback_registered{false};
+
+        // Pending hook callbacks from game thread (deferred to event loop thread)
+        std::vector<PendingHookCallback> m_pending_hook_callbacks;
+        std::mutex m_pending_hook_callbacks_mutex;
         
         // Module cache (public for access from module loader)
         std::unordered_map<std::string, bool> m_loaded_modules;
@@ -146,6 +186,9 @@ namespace RC::JSScript
         // Key binding management
         auto register_key_bind(JSContext* ctx, uint8_t key, JSValue callback, 
                               bool with_ctrl, bool with_shift, bool with_alt) -> bool;
+
+        // Game thread dispatcher for RPC calls
+        auto setup_game_thread_dispatcher() -> void;
 
         // Static hook callbacks for UE4SS hook system
         static void js_ufunction_hook_pre(Unreal::UnrealScriptFunctionCallableContext& context, void* custom_data);

@@ -184,30 +184,27 @@ var hookCheckInterval = setInterval(function() {
 print("Started hook polling loop...");
 
 // ============================================
-// Example 4: Keyboard shortcuts
+// Example 4: 蓝图消息传送（服务端 -> 所有客户端）
 // ============================================
+//
+// 如果 OnExecuteScript 在蓝图里设置了 Replicates: Multicast + Reliable，
+// CallFunction 会检测到 FUNC_Net 标志，自动将 ProcessEvent 排队到游戏线程执行。
+// 在游戏线程上 ProcessEvent 会走 UE4 的 RPC 路径，触发网络复制。
 
-// Register F5 key to call OnExecuteScript with a string parameter
+// Register F5 key to call OnExecuteScript (auto-detected as Net function -> game thread RPC)
 RegisterKeyBind("F5", function() {
-    print("F5 pressed! Calling OnExecuteScript...");
+    print("F5 pressed! Calling OnExecuteScript (will be queued to game thread for RPC)...");
     
     try {
-        // Find the MI_SpawnMods object
         var spawnMods = FindFirstOf("MI_SpawnMods_C");
-        print("FindFirstOf result:", spawnMods);
         
         if (spawnMods) {
             print("Found MI_SpawnMods_C:", spawnMods.GetFullName());
-            
-            // Call OnExecuteScript with a string parameter
+            // CallFunction automatically detects FUNC_Net and queues to game thread
             var result = CallFunction(spawnMods, "OnExecuteScript", "Hello from JavaScript!");
-            print("CallFunction result:", result);
+            print("CallFunction result (queued):", result);
         } else {
-            print("MI_SpawnMods_C not found, trying to find all instances...");
-            
-            // Try to list available objects
-            var allSpawnMods = FindAllOf("MI_SpawnMods_C");
-            print("FindAllOf result count:", allSpawnMods ? allSpawnMods.length : 0);
+            print("MI_SpawnMods_C not found.");
         }
     } catch (e) {
         print("Error in F5 handler:", e);
