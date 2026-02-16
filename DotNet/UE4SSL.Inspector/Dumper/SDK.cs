@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using UnrealSharp;
 
 namespace UE4SSL.Inspector.Dumper
@@ -678,6 +678,7 @@ namespace UE4SSL.Inspector.Dumper
                     break;
 
                 case "StrProperty":
+                case "AnsiStrProperty":
                 case "TextProperty":
                 case "NameProperty":
                 case "SoftObjectProperty":

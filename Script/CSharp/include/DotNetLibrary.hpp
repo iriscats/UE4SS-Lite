@@ -69,6 +69,7 @@ namespace RC::DotNetLibrary
         NameProperty,
         TextProperty,
         StrProperty,
+        AnsiStrProperty,
         SoftClassProperty,
         InterfaceProperty,
         Invalid,

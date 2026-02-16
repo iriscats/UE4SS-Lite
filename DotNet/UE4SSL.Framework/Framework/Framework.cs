@@ -1,4 +1,4 @@
-﻿using System.Numerics;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -101,6 +101,7 @@ namespace UE4SSL.Framework
 					return typeof(WeakObjectPtr);
 				case PropertyType.NameProperty:
 				case PropertyType.StrProperty:
+				case PropertyType.AnsiStrProperty:
 				case PropertyType.TextProperty:
 					return typeof(string);
 			}

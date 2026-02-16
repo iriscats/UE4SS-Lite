@@ -21,6 +21,8 @@
 #include <Unreal/FString.hpp>
 #include <Unreal/Hooks.hpp>
 #include <Unreal/Property/FStrProperty.hpp>
+#include <Unreal/Property/FAnsiStrProperty.hpp>
+#include <Unreal/Core/Containers/FAnsiString.hpp>
 #include <Unreal/Property/FBoolProperty.hpp>
 #include <Unreal/Property/FNumericProperty.hpp>
 #include <Unreal/Property/FObjectProperty.hpp>
@@ -1443,7 +1445,7 @@ namespace RC::JSScript
                 // Handle different property types
                 if (prop->IsA<Unreal::FStrProperty>())
                 {
-                    // String parameter - manually construct raw FString layout
+                    // FString parameter - manually construct raw FString layout
                     // FString memory layout: { wchar_t* Data, int32_t Num, int32_t Max }
                     const char* str_val = JS_ToCString(ctx, argv[js_arg_index]);
                     if (str_val)
@@ -1474,6 +1476,31 @@ namespace RC::JSScript
                             raw_fstr->Max = max;
                         }
                         
+                    }
+                }
+                else if (prop->IsA<Unreal::FAnsiStrProperty>())
+                {
+                    // FAnsiString parameter (UE 5.7+) - narrow string layout
+                    const char* str_val = JS_ToCString(ctx, argv[js_arg_index]);
+                    if (str_val)
+                    {
+                        size_t len = strlen(str_val) + 1;
+                        char* buffer = static_cast<char*>(malloc(len));
+                        if (buffer)
+                        {
+                            std::memcpy(buffer, str_val, len);
+                            raw_string_buffers.push_back(reinterpret_cast<wchar_t*>(buffer));
+                            struct RawFAnsiString {
+                                char* Data;
+                                int32_t Num;
+                                int32_t Max;
+                            };
+                            auto* raw_astr = static_cast<RawFAnsiString*>(prop_addr);
+                            raw_astr->Data = buffer;
+                            raw_astr->Num = static_cast<int32_t>(len);
+                            raw_astr->Max = static_cast<int32_t>(len);
+                        }
+                        JS_FreeCString(ctx, str_val);
                     }
                 }
                 else if (prop->IsA<Unreal::FBoolProperty>())
@@ -1912,6 +1939,17 @@ namespace RC::JSScript
             return JS_NewString(ctx, "");
         }
 
+        // Check for FAnsiStrProperty (FAnsiString, UE 5.7+)
+        if (prop->IsA<Unreal::FAnsiStrProperty>())
+        {
+            Unreal::FAnsiString* astr = static_cast<Unreal::FAnsiString*>(data);
+            if (astr && astr->GetCharArray())
+            {
+                return JS_NewString(ctx, astr->GetCharArray());
+            }
+            return JS_NewString(ctx, "");
+        }
+
         // Check for FNameProperty (FName)
         if (prop->IsA<Unreal::FNameProperty>())
         {
@@ -2059,6 +2097,19 @@ namespace RC::JSScript
                     if (fstr && fstr->GetCharArray())
                     {
                         p.str_val = fstr->GetCharArray();
+                    }
+                }
+                else if (prop->IsA<Unreal::FAnsiStrProperty>())
+                {
+                    p.type = JSMod::PendingHookCallbackParam::Type::String;
+                    Unreal::FAnsiString* astr = static_cast<Unreal::FAnsiString*>(data);
+                    if (astr && astr->GetCharArray())
+                    {
+                        const char* c = astr->GetCharArray();
+                        size_t n = (astr->Num() > 0) ? static_cast<size_t>(astr->Num() - 1) : 0; // exclude null
+                        p.str_val.resize(n);
+                        for (size_t i = 0; i < n; i++)
+                            p.str_val[i] = static_cast<wchar_t>(static_cast<unsigned char>(c[i]));
                     }
                 }
                 else if (prop->IsA<Unreal::FNameProperty>())
@@ -2239,6 +2290,19 @@ namespace RC::JSScript
                     p.type = JSMod::PendingHookCallbackParam::Type::String;
                     Unreal::FString* fstr = static_cast<Unreal::FString*>(data);
                     if (fstr && fstr->GetCharArray()) { p.str_val = fstr->GetCharArray(); }
+                }
+                else if (prop->IsA<Unreal::FAnsiStrProperty>())
+                {
+                    p.type = JSMod::PendingHookCallbackParam::Type::String;
+                    Unreal::FAnsiString* astr = static_cast<Unreal::FAnsiString*>(data);
+                    if (astr && astr->GetCharArray())
+                    {
+                        const char* c = astr->GetCharArray();
+                        size_t n = (astr->Num() > 0) ? static_cast<size_t>(astr->Num() - 1) : 0;
+                        p.str_val.resize(n);
+                        for (size_t i = 0; i < n; i++)
+                            p.str_val[i] = static_cast<wchar_t>(static_cast<unsigned char>(c[i]));
+                    }
                 }
                 else if (prop->IsA<Unreal::FNameProperty>())
                 {

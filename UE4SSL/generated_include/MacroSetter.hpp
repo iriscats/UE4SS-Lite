@@ -14,10 +14,16 @@ if (auto val = parser.get_int64(STR("UObjectBase"), STR("Outer"), -1); val != -1
     Unreal::UObjectBase::MemberOffsets.emplace(STR("Outer"), static_cast<int32_t>(val));
 if (auto val = parser.get_int64(STR("UObjectBase"), STR("OuterPrivate"), -1); val != -1)
     Unreal::UObjectBase::MemberOffsets.emplace(STR("OuterPrivate"), static_cast<int32_t>(val));
+if (auto val = parser.get_int64(STR("UObjectBase"), STR("UEP_TotalSize"), -1); val != -1)
+    Unreal::UObjectBase::MemberOffsets.emplace(STR("UEP_TotalSize"), static_cast<int32_t>(val));
 if (auto val = parser.get_int64(STR("UScriptStruct::ICppStructOps"), STR("Alignment"), -1); val != -1)
     Unreal::UScriptStruct::ICppStructOps::MemberOffsets.emplace(STR("Alignment"), static_cast<int32_t>(val));
 if (auto val = parser.get_int64(STR("UScriptStruct::ICppStructOps"), STR("Size"), -1); val != -1)
     Unreal::UScriptStruct::ICppStructOps::MemberOffsets.emplace(STR("Size"), static_cast<int32_t>(val));
+if (auto val = parser.get_int64(STR("UScriptStruct::ICppStructOps"), STR("FakeVPtr"), -1); val != -1)
+    Unreal::UScriptStruct::ICppStructOps::MemberOffsets.emplace(STR("FakeVPtr"), static_cast<int32_t>(val));
+if (auto val = parser.get_int64(STR("UScriptStruct::ICppStructOps"), STR("UEP_TotalSize"), -1); val != -1)
+    Unreal::UScriptStruct::ICppStructOps::MemberOffsets.emplace(STR("UEP_TotalSize"), static_cast<int32_t>(val));
 if (auto val = parser.get_int64(STR("FProperty"), STR("ArrayDim"), -1); val != -1)
     Unreal::FProperty::MemberOffsets.emplace(STR("ArrayDim"), static_cast<int32_t>(val));
 if (auto val = parser.get_int64(STR("FProperty"), STR("DestructorLinkNext"), -1); val != -1)
@@ -68,6 +74,8 @@ if (auto val = parser.get_int64(STR("FOutputDevice"), STR("bAutoEmitLineTerminat
     Unreal::FOutputDevice::MemberOffsets.emplace(STR("bAutoEmitLineTerminator"), static_cast<int32_t>(val));
 if (auto val = parser.get_int64(STR("FOutputDevice"), STR("bSuppressEventTag"), -1); val != -1)
     Unreal::FOutputDevice::MemberOffsets.emplace(STR("bSuppressEventTag"), static_cast<int32_t>(val));
+if (auto val = parser.get_int64(STR("FOutputDevice"), STR("UEP_TotalSize"), -1); val != -1)
+    Unreal::FOutputDevice::MemberOffsets.emplace(STR("UEP_TotalSize"), static_cast<int32_t>(val));
 if (auto val = parser.get_int64(STR("UFunction"), STR("EventGraphCallOffset"), -1); val != -1)
     Unreal::UFunction::MemberOffsets.emplace(STR("EventGraphCallOffset"), static_cast<int32_t>(val));
 if (auto val = parser.get_int64(STR("UFunction"), STR("EventGraphFunction"), -1); val != -1)
@@ -119,6 +127,10 @@ if (auto val = parser.get_int64(STR("UStruct"), STR("SuperStruct"), -1); val != 
     Unreal::UStruct::MemberOffsets.emplace(STR("SuperStruct"), static_cast<int32_t>(val));
 if (auto val = parser.get_int64(STR("UStruct"), STR("UnresolvedScriptProperties"), -1); val != -1)
     Unreal::UStruct::MemberOffsets.emplace(STR("UnresolvedScriptProperties"), static_cast<int32_t>(val));
+if (auto val = parser.get_int64(STR("UStruct"), STR("StructStateFlags"), -1); val != -1)
+    Unreal::UStruct::MemberOffsets.emplace(STR("StructStateFlags"), static_cast<int32_t>(val));
+if (auto val = parser.get_int64(STR("UStruct"), STR("UEP_TotalSize"), -1); val != -1)
+    Unreal::UStruct::MemberOffsets.emplace(STR("UEP_TotalSize"), static_cast<int32_t>(val));
 if (auto val = parser.get_int64(STR("FDelegateProperty"), STR("SignatureFunction"), -1); val != -1)
     Unreal::FDelegateProperty::MemberOffsets.emplace(STR("SignatureFunction"), static_cast<int32_t>(val));
 if (auto val = parser.get_int64(STR("UGameViewportClient"), STR("ActiveSplitscreenType"), -1); val != -1)

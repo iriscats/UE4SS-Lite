@@ -41,6 +41,7 @@
 #include <Unreal/UScriptStruct.hpp>
 #include <Unreal/UnrealInitializer.hpp>
 #include <Unreal/World.hpp>
+#include <Unreal/FWorldContext.hpp>
 #include <UnrealDef.hpp>
 
 #include <polyhook2/PE/IatHook.hpp>
